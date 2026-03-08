@@ -16,8 +16,25 @@ import {
 
 type GameMode = "contest" | "learn" | "practice";
 type HelpMode = "hint" | "steps" | "explain";
+type ScreenId = "home" | "game" | "result";
 
 const tts = new TTSQueue();
+const defaultScrollSelectors: Record<ScreenId, string> = {
+  home: "#home-screen .screen-scroll",
+  game: "#game-screen .question-card",
+  result: "#result-screen .result-card"
+};
+
+let preferredScrollTarget: HTMLElement | null = null;
+let touchScrollState: {
+  target: HTMLElement | null;
+  startY: number;
+  startScrollTop: number;
+} = {
+  target: null,
+  startY: 0,
+  startScrollTop: 0
+};
 
 const state: {
   theme: "neon" | "gameboy";
@@ -81,7 +98,25 @@ function qs<T extends Element>(selector: string): T {
   return node as T;
 }
 
-function setScreen(screenId: "home" | "game" | "result"): void {
+function setPreferredScrollTarget(target: HTMLElement | null): void {
+  preferredScrollTarget = target;
+  if (target) target.focus({ preventScroll: true });
+}
+
+function defaultScrollTargetForScreen(screenId: ScreenId): HTMLElement | null {
+  return document.querySelector<HTMLElement>(defaultScrollSelectors[screenId]);
+}
+
+function syncViewportMetrics(): void {
+  const viewport = window.visualViewport;
+  const width = Math.max(180, Math.floor(Math.min(240, viewport?.width ?? window.innerWidth ?? 240)));
+  const height = Math.max(220, Math.floor(Math.min(282, viewport?.height ?? window.innerHeight ?? 282)));
+  document.documentElement.style.setProperty("--viewport-width", `${width}px`);
+  document.documentElement.style.setProperty("--viewport-height", `${height}px`);
+  document.body.dataset.compactHeight = height < 270 ? "true" : "false";
+}
+
+function setScreen(screenId: ScreenId): void {
   const map: Record<string, string> = {
     home: "home-screen",
     game: "game-screen",
@@ -97,6 +132,7 @@ function setScreen(screenId: "home" | "game" | "result"): void {
       }
     }
   }
+  setPreferredScrollTarget(defaultScrollTargetForScreen(screenId));
 }
 
 function theme(themeName: "neon" | "gameboy"): void {
@@ -330,26 +366,88 @@ function fitOptionText(node: HTMLButtonElement, text: string): void {
   node.style.fontSize = "14px";
 }
 
+function findScrollableFromNode(node: EventTarget | null): HTMLElement | null {
+  if (!(node instanceof HTMLElement)) return null;
+  return node.closest<HTMLElement>('[data-scrollable="true"]');
+}
+
 function activeScrollTarget(): HTMLElement | null {
   const overlay = document.querySelector<HTMLElement>("#coach-overlay.active");
   if (overlay) {
     return overlay.querySelector<HTMLElement>('[data-scrollable="true"]') || overlay;
   }
 
+  if (preferredScrollTarget && preferredScrollTarget.isConnected) return preferredScrollTarget;
+
   const active = document.querySelector<HTMLElement>(".screen.active");
   if (!active) return null;
 
-  const overflowing = [...active.querySelectorAll<HTMLElement>('[data-scrollable="true"]')].find(
-    (node) => node.scrollHeight > node.clientHeight + 4
-  );
-
-  return overflowing || active;
+  if (active.id === "game-screen") return defaultScrollTargetForScreen("game");
+  if (active.id === "result-screen") return defaultScrollTargetForScreen("result");
+  return defaultScrollTargetForScreen("home");
 }
 
 function scrollActiveScreen(deltaY: number): void {
   const target = activeScrollTarget();
   if (!target) return;
-  target.scrollTop += deltaY;
+  const maxScroll = Math.max(0, target.scrollHeight - target.clientHeight);
+  if (maxScroll <= 0) return;
+  const nextTop = Math.max(0, Math.min(maxScroll, target.scrollTop + deltaY));
+  if (nextTop === target.scrollTop) return;
+  target.scrollTop = nextTop;
+  setPreferredScrollTarget(target);
+}
+
+function bindScrollableFallbacks(): void {
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const scrollable = findScrollableFromNode(event.target);
+      if (scrollable) setPreferredScrollTarget(scrollable);
+    },
+    { passive: true }
+  );
+
+  document.addEventListener(
+    "touchstart",
+    (event) => {
+      const scrollable = findScrollableFromNode(event.target);
+      if (!scrollable || scrollable.scrollHeight <= scrollable.clientHeight + 2) {
+        touchScrollState.target = null;
+        return;
+      }
+      const touch = event.touches[0];
+      if (!touch) return;
+      setPreferredScrollTarget(scrollable);
+      touchScrollState = {
+        target: scrollable,
+        startY: touch.clientY,
+        startScrollTop: scrollable.scrollTop
+      };
+    },
+    { passive: true }
+  );
+
+  document.addEventListener(
+    "touchmove",
+    (event) => {
+      const touch = event.touches[0];
+      const target = touchScrollState.target;
+      if (!touch || !target) return;
+      const delta = touch.clientY - touchScrollState.startY;
+      if (Math.abs(delta) < 3) return;
+      target.scrollTop = touchScrollState.startScrollTop - delta;
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+
+  const resetTouchScroll = (): void => {
+    touchScrollState.target = null;
+  };
+
+  document.addEventListener("touchend", resetTouchScroll, { passive: true });
+  document.addEventListener("touchcancel", resetTouchScroll, { passive: true });
 }
 
 function applyLearnStep(): void {
@@ -429,8 +527,9 @@ function renderQuestion(): void {
   state.questionPauseDepth = 0;
   state.answeredCurrent = false;
   state.lastAnswerCorrect = null;
-  const scrollTarget = qs<HTMLElement>(".question-scroll");
+  const scrollTarget = qs<HTMLElement>(".question-card");
   scrollTarget.scrollTop = 0;
+  setPreferredScrollTarget(scrollTarget);
 
   qs<HTMLElement>("#hud-q").textContent = `${state.index + 1}/${totalQuestionsInRun()}`;
   qs<HTMLElement>("#hud-points").textContent = String(state.score);
@@ -507,6 +606,7 @@ function showCoach(question: QuestionInstance, mode: HelpMode): void {
   overlay.classList.add("active");
   overlay.setAttribute("aria-hidden", "false");
   renderHelpOverlay(question);
+  setPreferredScrollTarget(qs<HTMLElement>("#coach-body"));
 }
 
 function hideCoach(): void {
@@ -515,6 +615,10 @@ function hideCoach(): void {
   overlay.classList.remove("active");
   overlay.setAttribute("aria-hidden", "true");
   resumeQuestionClock();
+  const screen = document.querySelector<HTMLElement>(".screen.active");
+  if (screen?.id === "game-screen") {
+    setPreferredScrollTarget(defaultScrollTargetForScreen("game"));
+  }
 }
 
 function setHelpMode(mode: HelpMode): void {
@@ -696,7 +800,29 @@ function exitHome(): void {
   setScreen("home");
 }
 
+function renderAppToText(): string {
+  const activeScreen = document.querySelector<HTMLElement>(".screen.active")?.id || "unknown";
+  const question = currentQuestion();
+  const scrollTarget = activeScrollTarget();
+  return JSON.stringify({
+    screen: activeScreen,
+    mode: state.mode,
+    theme: state.theme,
+    grade: state.grade,
+    index: state.index + 1,
+    total: totalQuestionsInRun(),
+    question: question?.prompt || "",
+    options: question?.options || [],
+    helpOpen: qs<HTMLElement>("#coach-overlay").classList.contains("active"),
+    scrollTop: scrollTarget?.scrollTop ?? 0,
+    scrollHeight: scrollTarget?.scrollHeight ?? 0,
+    clientHeight: scrollTarget?.clientHeight ?? 0
+  });
+}
+
 function wireUi(): void {
+  syncViewportMetrics();
+  bindScrollableFallbacks();
   buildGradeButtons();
   updateModeInfo();
   theme("neon");
@@ -771,6 +897,14 @@ function wireUi(): void {
     if (!q) return;
     void showCoach(q, "hint");
   });
+
+  window.addEventListener("resize", syncViewportMetrics);
+  window.visualViewport?.addEventListener("resize", syncViewportMetrics);
+  window.render_game_to_text = renderAppToText;
+  window.advanceTime = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
 }
 
 async function initializeApp(): Promise<void> {

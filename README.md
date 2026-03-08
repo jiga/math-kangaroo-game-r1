@@ -2,6 +2,12 @@
 
 This build is optimized for Rabbit r1 and now prioritizes Grade 1-2 competition preparation with curriculum-complete coverage, official format fidelity, adaptive practice progression, deterministic coaching, and optional LLM enrichment.
 
+Related docs:
+
+- `DEPLOY.md` - deployment and local install flow
+- `PUBLISHING.md` - public GitHub repo and Pages publishing flow
+- `RELEASE_CHECKLIST.md` - pre-release and post-deploy checklist
+
 ## What Changed
 
 - Modular source architecture under `src/` with generated single-file output.

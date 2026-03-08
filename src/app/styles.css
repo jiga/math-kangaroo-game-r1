@@ -1,6 +1,8 @@
 :root {
-  --safe-top: 20px;
-  --safe-bottom: 8px;
+  --viewport-width: 240px;
+  --viewport-height: 282px;
+  --safe-top: 10px;
+  --safe-bottom: 5px;
   --safe-side: 6px;
   --bg: #050b18;
   --card: #07142a;
@@ -22,16 +24,22 @@ html,
 body {
   margin: 0;
   width: 100%;
-  height: 100dvh;
+  height: 100%;
   background: radial-gradient(circle at 20% 10%, #10234a, #04070f 60%);
   color: var(--text);
   font-family: "Trebuchet MS", "Verdana", sans-serif;
   overflow: hidden;
 }
 
+body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
 .app {
-  width: min(100vw, 240px);
-  height: min(100dvh, 282px);
+  width: min(240px, var(--viewport-width));
+  height: min(282px, var(--viewport-height));
   margin: 0 auto;
   padding-top: calc(var(--safe-top) + env(safe-area-inset-top, 0px));
   padding-right: calc(var(--safe-side) + env(safe-area-inset-right, 0px));
@@ -100,7 +108,7 @@ h2 {
 }
 
 .btn {
-  min-height: 28px;
+  min-height: 26px;
   border-radius: 11px;
   border: 2px solid var(--line);
   background: var(--option-bg);
@@ -118,7 +126,7 @@ h2 {
 }
 
 .btn-theme {
-  min-width: 44px;
+  min-width: 42px;
   font-size: 8px;
 }
 
@@ -131,7 +139,7 @@ h2 {
 
 .btn-mode {
   flex: 1;
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .grade-grid {
@@ -141,7 +149,7 @@ h2 {
 }
 
 .grade-grid .btn {
-  min-height: 26px;
+  min-height: 24px;
   font-size: 10px;
   padding: 0;
 }
@@ -157,19 +165,14 @@ h2 {
   background: linear-gradient(90deg, var(--accent), var(--accent2));
   color: #05080f;
   border: 0;
-  min-height: 34px;
-  font-size: 16px;
+  min-height: 30px;
+  font-size: 14px;
   letter-spacing: 1.2px;
   font-weight: 900;
 }
 
-#home-screen.active {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
 .screen-scroll,
-.question-scroll,
+.question-card,
 .result-card,
 .coach-body {
   min-height: 0;
@@ -181,7 +184,7 @@ h2 {
 }
 
 .screen-scroll::-webkit-scrollbar,
-.question-scroll::-webkit-scrollbar,
+.question-card::-webkit-scrollbar,
 .result-card::-webkit-scrollbar,
 .coach-body::-webkit-scrollbar {
   display: none;
@@ -190,44 +193,29 @@ h2 {
 .screen-scroll {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 4px;
 }
 
-#game-screen.active {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 3px;
-}
-
-#result-screen.active {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+.result-card {
+  flex: 1;
 }
 
 .question-card {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.question-scroll {
-  display: flex;
-  flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding-bottom: 2px;
+  padding-bottom: 4px;
 }
 
 .hud {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 3px;
-  padding: 3px;
+  padding: 2px;
 }
 
 .hud-item {
-  min-height: 18px;
+  min-height: 16px;
   border: 1px solid var(--line);
   border-radius: 999px;
   display: flex;
@@ -235,7 +223,7 @@ h2 {
   justify-content: center;
   gap: 3px;
   color: var(--text);
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
   white-space: nowrap;
   padding: 0 4px;
@@ -243,12 +231,12 @@ h2 {
 
 .hud-label {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 6px;
   letter-spacing: 0.5px;
 }
 
 .question-meta {
-  font-size: 8px;
+  font-size: 7px;
   color: var(--muted);
   margin-bottom: 2px;
 }
@@ -257,7 +245,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 4px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   background: color-mix(in srgb, var(--option-bg) 85%, #fff 15%);
 }
 
@@ -298,7 +286,7 @@ h2 {
 
 .learn-visual {
   margin-top: 4px;
-  min-height: 64px;
+  min-height: 56px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent 30%);
   background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 22%, transparent 78%), transparent 55%);
@@ -350,7 +338,7 @@ h2 {
 .question-visual {
   margin-top: 3px;
   min-height: 0;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent 30%);
   border-radius: 10px;
   background: color-mix(in srgb, var(--option-bg) 88%, #fff 12%);
@@ -369,23 +357,23 @@ h2 {
 .question-visual[data-kind="region_compare"] svg,
 .question-visual[data-kind="venn"] svg,
 .question-visual[data-kind="maze"] svg {
-  max-height: 92px;
+  max-height: 84px;
 }
 
 .options {
-  margin-top: 4px;
+  margin-top: 3px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 3px;
 }
 
 .option {
-  min-height: 27px;
+  min-height: 25px;
   border: 2px solid var(--line);
   border-radius: 11px;
   background: color-mix(in srgb, var(--option-bg) 85%, #fff 15%);
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.1;
   font-weight: 800;
   padding: 2px 5px;
@@ -409,8 +397,8 @@ h2 {
 .footer-actions .btn,
 .result-actions .btn {
   flex: 1;
-  min-height: 24px;
-  font-size: 9px;
+  min-height: 22px;
+  font-size: 8px;
 }
 
 .btn-ghost {
@@ -436,7 +424,7 @@ h2 {
 .overlay-card {
   width: 100%;
   max-width: 230px;
-  max-height: min(100%, 228px);
+  max-height: min(100%, 222px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -461,8 +449,8 @@ h2 {
 .coach-mode-row .btn,
 .coach-bottom .btn {
   flex: 1;
-  min-height: 28px;
-  font-size: 10px;
+  min-height: 24px;
+  font-size: 9px;
 }
 
 .coach-body {
@@ -482,6 +470,58 @@ h2 {
 .result-line {
   font-size: 11px;
   margin-top: 4px;
+}
+
+body[data-compact-height="true"] {
+  --safe-top: 8px;
+  --safe-bottom: 4px;
+}
+
+body[data-compact-height="true"] h1 {
+  font-size: 11px;
+}
+
+body[data-compact-height="true"] .btn {
+  min-height: 24px;
+}
+
+body[data-compact-height="true"] .grade-grid .btn {
+  min-height: 22px;
+}
+
+body[data-compact-height="true"] .btn-start {
+  min-height: 28px;
+  font-size: 13px;
+}
+
+body[data-compact-height="true"] .hud-item {
+  min-height: 15px;
+  font-size: 6px;
+}
+
+body[data-compact-height="true"] .question-meta {
+  font-size: 6px;
+}
+
+body[data-compact-height="true"] .learn-panel {
+  padding: 3px;
+}
+
+body[data-compact-height="true"] .learn-visual {
+  min-height: 48px;
+}
+
+body[data-compact-height="true"] .question-visual[data-kind="broken_line"] svg,
+body[data-compact-height="true"] .question-visual[data-kind="pictograph"] svg,
+body[data-compact-height="true"] .question-visual[data-kind="region_compare"] svg,
+body[data-compact-height="true"] .question-visual[data-kind="venn"] svg,
+body[data-compact-height="true"] .question-visual[data-kind="maze"] svg {
+  max-height: 74px;
+}
+
+body[data-compact-height="true"] .option {
+  min-height: 23px;
+  font-size: 13px;
 }
 
 body[data-theme="gameboy"] {

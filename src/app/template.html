@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="viewport" content="width=240,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <title>Math Kangaroo R1</title>
   <style>
 __APP_CSS__
@@ -19,7 +19,7 @@ __APP_CSS__
         </div>
       </section>
 
-      <div class="screen-scroll" data-scrollable="true">
+      <div class="screen-scroll" data-scrollable="true" tabindex="0">
         <section class="card">
           <h2>SELECT GRADE</h2>
           <div id="grade-grid" class="grade-grid"></div>
@@ -47,26 +47,24 @@ __APP_CSS__
         <div class="hud-item" id="hud-timer-wrap"><span class="hud-label">T</span><span id="hud-time">75:00</span></div>
       </section>
 
-      <section class="card question-card">
-        <div class="question-scroll" data-scrollable="true">
-          <div id="question-meta" class="question-meta"></div>
-          <div id="learn-panel" class="learn-panel" hidden>
-            <div class="learn-top">
-              <div id="learn-step-title" class="learn-step-title"></div>
-              <div id="learn-step-index" class="learn-step-index"></div>
-            </div>
-            <div class="learn-progress"><span id="learn-progress-fill"></span></div>
-            <div id="learn-visual" class="learn-visual" aria-live="polite"></div>
-            <div id="learn-step-body" class="learn-step-body"></div>
-            <div class="learn-actions">
-              <button id="learn-skip" class="btn btn-ghost">SKIP</button>
-              <button id="learn-next" class="btn btn-mode">NEXT</button>
-            </div>
+      <section class="card question-card" data-scrollable="true" tabindex="0">
+        <div id="question-meta" class="question-meta"></div>
+        <div id="learn-panel" class="learn-panel" hidden>
+          <div class="learn-top">
+            <div id="learn-step-title" class="learn-step-title"></div>
+            <div id="learn-step-index" class="learn-step-index"></div>
           </div>
-          <div id="question-text" class="question-text"></div>
-          <div id="question-visual" class="question-visual" aria-live="polite"></div>
-          <div id="options" class="options"></div>
+          <div class="learn-progress"><span id="learn-progress-fill"></span></div>
+          <div id="learn-visual" class="learn-visual" aria-live="polite"></div>
+          <div id="learn-step-body" class="learn-step-body"></div>
+          <div class="learn-actions">
+            <button id="learn-skip" class="btn btn-ghost">SKIP</button>
+            <button id="learn-next" class="btn btn-mode">NEXT</button>
+          </div>
         </div>
+        <div id="question-text" class="question-text"></div>
+        <div id="question-visual" class="question-visual" aria-live="polite"></div>
+        <div id="options" class="options"></div>
       </section>
 
       <section class="footer-actions">
@@ -76,7 +74,7 @@ __APP_CSS__
     </main>
 
     <main id="result-screen" class="screen">
-      <section class="card result-card" data-scrollable="true">
+      <section class="card result-card" data-scrollable="true" tabindex="0">
         <h2>RESULT</h2>
         <p class="result-line">Score: <span id="res-score"></span></p>
         <p class="result-line">Correct: <span id="res-correct"></span></p>
@@ -99,7 +97,7 @@ __APP_CSS__
           <button id="coach-steps" class="btn btn-mode coach-mode-btn" data-help-mode="steps">STEPS</button>
           <button id="coach-explain" class="btn btn-mode coach-mode-btn" data-help-mode="explain">WHY</button>
         </div>
-        <pre id="coach-body" class="coach-body" data-scrollable="true"></pre>
+        <pre id="coach-body" class="coach-body" data-scrollable="true" tabindex="0"></pre>
         <div class="coach-bottom">
           <button id="coach-say" class="btn btn-mode">SAY IT</button>
           <button id="coach-continue" class="btn btn-start">CONTINUE</button>
