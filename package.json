@@ -1,0 +1,19 @@
+{
+  "name": "math-kangaroo-game-r1",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "validate": "node --import tsx ./src/content/validateBank.ts",
+    "test": "node --test --import tsx ./tests/*.test.ts",
+    "check": "npm run validate && npm run test",
+    "dev": "python3 -m http.server 8000 --bind 127.0.0.1 --directory dist",
+    "pages:build": "npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

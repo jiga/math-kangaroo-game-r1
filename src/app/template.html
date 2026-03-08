@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>Math Kangaroo R1</title>
+  <style>
+__APP_CSS__
+  </style>
+</head>
+<body data-theme="neon">
+  <div id="app" class="app">
+    <main id="home-screen" class="screen active">
+      <section class="card head-row">
+        <h1 id="title">MATH KANGAROO</h1>
+        <div class="theme-switch" role="group" aria-label="Theme">
+          <button id="theme-gb" class="btn btn-theme" data-theme="gameboy">GB</button>
+          <button id="theme-neon" class="btn btn-theme active" data-theme="neon">NEON</button>
+        </div>
+      </section>
+
+      <div class="screen-scroll" data-scrollable="true">
+        <section class="card">
+          <h2>SELECT GRADE</h2>
+          <div id="grade-grid" class="grade-grid"></div>
+        </section>
+
+        <section class="card">
+          <h2>MODE</h2>
+          <div class="mode-row">
+            <button id="mode-contest" class="btn btn-mode active" data-mode="contest">CONTEST</button>
+            <button id="mode-learn" class="btn btn-mode" data-mode="learn">LEARN</button>
+            <button id="mode-practice" class="btn btn-mode" data-mode="practice">PRACTICE</button>
+          </div>
+          <p id="mode-info" class="mode-info"></p>
+        </section>
+      </div>
+
+      <button id="start-btn" class="btn btn-start">START</button>
+    </main>
+
+    <main id="game-screen" class="screen">
+      <section class="card hud">
+        <div class="hud-item"><span class="hud-label">G</span><span id="hud-grade">1</span></div>
+        <div class="hud-item"><span class="hud-label">Q</span><span id="hud-q">1/24</span></div>
+        <div class="hud-item"><span class="hud-label">PTS</span><span id="hud-points">0</span></div>
+        <div class="hud-item" id="hud-timer-wrap"><span class="hud-label">T</span><span id="hud-time">75:00</span></div>
+      </section>
+
+      <section class="card question-card">
+        <div class="question-scroll" data-scrollable="true">
+          <div id="question-meta" class="question-meta"></div>
+          <div id="learn-panel" class="learn-panel" hidden>
+            <div class="learn-top">
+              <div id="learn-step-title" class="learn-step-title"></div>
+              <div id="learn-step-index" class="learn-step-index"></div>
+            </div>
+            <div class="learn-progress"><span id="learn-progress-fill"></span></div>
+            <div id="learn-visual" class="learn-visual" aria-live="polite"></div>
+            <div id="learn-step-body" class="learn-step-body"></div>
+            <div class="learn-actions">
+              <button id="learn-skip" class="btn btn-ghost">SKIP</button>
+              <button id="learn-next" class="btn btn-mode">NEXT</button>
+            </div>
+          </div>
+          <div id="question-text" class="question-text"></div>
+          <div id="question-visual" class="question-visual" aria-live="polite"></div>
+          <div id="options" class="options"></div>
+        </div>
+      </section>
+
+      <section class="footer-actions">
+        <button id="home-btn" class="btn btn-ghost">HOME</button>
+        <button id="coach-btn" class="btn btn-ghost">HELP</button>
+      </section>
+    </main>
+
+    <main id="result-screen" class="screen">
+      <section class="card result-card" data-scrollable="true">
+        <h2>RESULT</h2>
+        <p class="result-line">Score: <span id="res-score"></span></p>
+        <p class="result-line">Correct: <span id="res-correct"></span></p>
+        <p class="result-line">Accuracy: <span id="res-accuracy"></span></p>
+        <p class="result-line" id="res-stage"></p>
+        <p class="result-line" id="res-focus"></p>
+      </section>
+      <div class="result-actions">
+        <button id="retry-btn" class="btn btn-start">PLAY AGAIN</button>
+        <button id="quit-btn" class="btn btn-ghost">HOME</button>
+      </div>
+    </main>
+
+    <div id="coach-overlay" class="overlay" aria-hidden="true">
+      <section class="card overlay-card">
+        <h2 id="coach-title">Help</h2>
+        <p id="coach-status" class="coach-status">Pick a card, then tap SAY IT or press the side button.</p>
+        <div class="coach-mode-row">
+          <button id="coach-hint" class="btn btn-mode coach-mode-btn" data-help-mode="hint">HINT</button>
+          <button id="coach-steps" class="btn btn-mode coach-mode-btn" data-help-mode="steps">STEPS</button>
+          <button id="coach-explain" class="btn btn-mode coach-mode-btn" data-help-mode="explain">WHY</button>
+        </div>
+        <pre id="coach-body" class="coach-body" data-scrollable="true"></pre>
+        <div class="coach-bottom">
+          <button id="coach-say" class="btn btn-mode">SAY IT</button>
+          <button id="coach-continue" class="btn btn-start">CONTINUE</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+__APP_JS__
+  </script>
+</body>
+</html>

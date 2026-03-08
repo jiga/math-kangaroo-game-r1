@@ -1,0 +1,46 @@
+node_modules/
+
+# Build artifacts
+dist/
+math-kangaroo-r1.zip
+
+# Local tool output
+output/
+playwright-report/
+test-results/
+tmp/
+
+# Editor / OS
+.DS_Store
+.cursor/
+.idea/
+.vscode/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Internal notes
+progress.md
+
+# Local OCR / debug artifacts
+/index-legacy.html
+/across_block.png
+/across_block_psm*.txt
+/across_lengths.tsv
+/center_samples.txt
+/centers.txt
+/down_block.png
+/down_block_psm*.txt
+/down_lengths.tsv
+/grid_bw*.txt
+/grid_crop.png
+/grid_dark_profile.txt
+/grid_pixels_gray.txt
+/puzzle_jimmy*.png
+/puzzle_jimmy_up_ocr.txt
+/top_cols.txt
+/top_rows.txt

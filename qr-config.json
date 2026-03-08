@@ -1,0 +1,50 @@
+{
+  "creation": {
+    "name": "Math Kangaroo Adventure",
+    "description": "Retro 3D math practice for Grades 1-12 with Game Boy and Arcade Neon themes.",
+    "version": "1.1.0",
+    "author": "Math Kangaroo Game",
+    "category": "education"
+  },
+  "qr_code": {
+    "size": "large",
+    "error_correction": "H",
+    "foreground_color": "#000000",
+    "background_color": "#FFFFFF"
+  },
+  "hosting": {
+    "recommended_providers": [
+      "netlify",
+      "github-pages",
+      "vercel"
+    ],
+    "requirements": [
+      "HTTPS enabled",
+      "index.html in root",
+      "Load time < 3 seconds"
+    ]
+  },
+  "installation": {
+    "methods": [
+      {
+        "type": "qr_code",
+        "instructions": "Scan QR code with Rabbit R1 camera"
+      },
+      {
+        "type": "voice",
+        "prompt": "Install Math Kangaroo Adventure from [YOUR_URL]"
+      }
+    ]
+  },
+  "hardware_support": [
+    "touchscreen",
+    "scroll_wheel",
+    "push_to_talk"
+  ],
+  "limitations": [
+    "No camera access",
+    "No microphone",
+    "Limited processing",
+    "Small screen (240x282)"
+  ]
+}

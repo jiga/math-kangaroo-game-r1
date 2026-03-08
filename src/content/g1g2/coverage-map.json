@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "pointDistribution": {
+    "3": 0.3333333333,
+    "4": 0.3333333333,
+    "5": 0.3333333334
+  },
+  "grades": {
+    "1": {
+      "targetTemplates": 180,
+      "curriculum": [
+        { "skillId": "counting_ordering", "label": "Counting/Ordering", "requiredTemplates": 12 },
+        { "skillId": "compare_number_region", "label": "Compare Number/Region Size", "requiredTemplates": 10 },
+        { "skillId": "ordinal_numbers", "label": "Ordinal Numbers", "requiredTemplates": 8 },
+        { "skillId": "place_value", "label": "Place Value", "requiredTemplates": 6 },
+        { "skillId": "single_digit_add_sub", "label": "Single-digit Add/Sub", "requiredTemplates": 14 },
+        { "skillId": "number_line", "label": "Number Line", "requiredTemplates": 6 },
+        { "skillId": "fractions_words", "label": "Fractions words", "requiredTemplates": 6 },
+        { "skillId": "sorting_classifying", "label": "Sorting/Classifying", "requiredTemplates": 8 },
+        { "skillId": "measurement_small", "label": "Measurement", "requiredTemplates": 10 },
+        { "skillId": "patterns", "label": "Patterns", "requiredTemplates": 8 },
+        { "skillId": "perimeter_broken_lines", "label": "Perimeter/Broken Lines", "requiredTemplates": 8 },
+        { "skillId": "relative_position", "label": "Relative Position", "requiredTemplates": 8 },
+        { "skillId": "shape_properties", "label": "Shape Properties", "requiredTemplates": 10 },
+        { "skillId": "maze_shape_puzzles", "label": "Mazes/Shape Puzzles", "requiredTemplates": 8 },
+        { "skillId": "cube_cuboid_visualization", "label": "Cube/Cuboid Visualization", "requiredTemplates": 4 },
+        { "skillId": "likelihood_vocabulary", "label": "Likelihood Vocabulary", "requiredTemplates": 4 },
+        { "skillId": "pictographs_bar_graphs", "label": "Pictographs/Bar Graphs", "requiredTemplates": 6 },
+        { "skillId": "venn_diagrams_easy", "label": "Venn Diagrams", "requiredTemplates": 4 },
+        { "skillId": "calendar", "label": "Calendar", "requiredTemplates": 8 },
+        { "skillId": "money_small", "label": "Money", "requiredTemplates": 8 },
+        { "skillId": "clock_full_half", "label": "Clock full/half", "requiredTemplates": 8 },
+        { "skillId": "symmetry_rotation", "label": "Symmetry/Rotation", "requiredTemplates": 4 },
+        { "skillId": "prealgebra_balance", "label": "Pre-algebra Balance", "requiredTemplates": 4 }
+      ]
+    },
+    "2": {
+      "targetTemplates": 180,
+      "curriculum": [
+        { "skillId": "counting_ordering", "label": "Counting/Ordering", "requiredTemplates": 8 },
+        { "skillId": "compare_number_region", "label": "Compare Number/Region Size", "requiredTemplates": 8 },
+        { "skillId": "ordinal_numbers", "label": "Ordinal Numbers", "requiredTemplates": 6 },
+        { "skillId": "place_value", "label": "Place Value", "requiredTemplates": 10 },
+        { "skillId": "single_digit_add_sub", "label": "Single-digit Add/Sub", "requiredTemplates": 10 },
+        { "skillId": "number_line", "label": "Number Line", "requiredTemplates": 8 },
+        { "skillId": "fractions_words", "label": "Fractions words", "requiredTemplates": 8 },
+        { "skillId": "sorting_classifying", "label": "Sorting/Classifying", "requiredTemplates": 8 },
+        { "skillId": "measurement_small", "label": "Measurement", "requiredTemplates": 8 },
+        { "skillId": "patterns", "label": "Patterns", "requiredTemplates": 8 },
+        { "skillId": "perimeter_broken_lines", "label": "Perimeter/Broken Lines", "requiredTemplates": 8 },
+        { "skillId": "relative_position", "label": "Relative Position", "requiredTemplates": 8 },
+        { "skillId": "shape_properties", "label": "Shape Properties", "requiredTemplates": 6 },
+        { "skillId": "maze_shape_puzzles", "label": "Mazes/Shape Puzzles", "requiredTemplates": 8 },
+        { "skillId": "cube_cuboid_visualization", "label": "Cube/Cuboid Visualization", "requiredTemplates": 8 },
+        { "skillId": "likelihood_vocabulary", "label": "Likelihood Vocabulary", "requiredTemplates": 6 },
+        { "skillId": "pictographs_bar_graphs", "label": "Pictographs/Bar Graphs", "requiredTemplates": 8 },
+        { "skillId": "venn_diagrams_easy", "label": "Venn Diagrams", "requiredTemplates": 6 },
+        { "skillId": "calendar", "label": "Calendar", "requiredTemplates": 8 },
+        { "skillId": "money_small", "label": "Money", "requiredTemplates": 8 },
+        { "skillId": "clock_full_half", "label": "Clock full/half", "requiredTemplates": 8 },
+        { "skillId": "symmetry_rotation", "label": "Symmetry/Rotation", "requiredTemplates": 8 },
+        { "skillId": "prealgebra_balance", "label": "Pre-algebra Balance", "requiredTemplates": 8 }
+      ]
+    }
+  }
+}
