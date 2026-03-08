@@ -703,7 +703,10 @@ function prepareQuestions(): void {
     setPracticeQuestionProvider({
       pickAny: (grade, avoidHashes, pointTier) => provider.pickAny(avoidHashes, pointTier),
       pickBySkill: (grade, skillId, avoidHashes, pointTier) => provider.pickBySkill(skillId, avoidHashes, pointTier),
-      allSkills: (grade) => allGrade12Skills(grade)
+      pickByFamily: (grade, skillId, familyId, avoidHashes, pointTier) =>
+        provider.pickByFamily(skillId, familyId, avoidHashes, pointTier),
+      allSkills: (grade) => allGrade12Skills(grade),
+      allFamilies: (grade, skillId) => provider.allFamilies(skillId)
     });
 
     state.practiceSession = startPracticeSession(state.profile, state.grade as 1 | 2);

@@ -10,6 +10,7 @@ function makeProfile(): PracticeProfile {
     updatedAt: 1,
     gradeStats: { "1": { sessions: 1, totalAttempts: 3, totalCorrect: 2 } },
     skills: {},
+    families: {},
     recentQuestionHashes: ["a", "b"]
   };
 }

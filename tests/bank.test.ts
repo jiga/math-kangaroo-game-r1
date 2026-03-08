@@ -48,7 +48,7 @@ for (const grade of [1, 2] as const) {
 
     for (const row of coverageMap.grades[String(grade) as "1" | "2"].curriculum) {
       const familyCount = familiesBySkill.get(row.skillId)?.size || 0;
-      const minFamilies = row.requiredTemplates >= 8 ? 3 : 2;
+      const minFamilies = row.requiredTemplates >= 8 ? 4 : 3;
       assert.ok(familyCount >= minFamilies, `${row.skillId} only has ${familyCount} families`);
     }
   });

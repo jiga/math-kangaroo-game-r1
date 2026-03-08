@@ -17,6 +17,7 @@ function emptyProfile(): PracticeProfile {
     updatedAt: Date.now(),
     gradeStats: {},
     skills: {},
+    families: {},
     recentQuestionHashes: []
   };
 }
@@ -27,7 +28,9 @@ test("practice stage starts diagnostic for new learner", () => {
   setPracticeQuestionProvider({
     pickAny: (grade, avoid, tier) => provider.pickAny(avoid, tier),
     pickBySkill: (grade, skill, avoid, tier) => provider.pickBySkill(skill, avoid, tier),
-    allSkills: (grade) => allGrade12Skills(grade)
+    pickByFamily: (grade, skill, family, avoid, tier) => provider.pickByFamily(skill, family, avoid, tier),
+    allSkills: (grade) => allGrade12Skills(grade),
+    allFamilies: (grade, skill) => provider.allFamilies(skill)
   });
 
   const session = startPracticeSession(profile, 1);
@@ -49,7 +52,9 @@ test("practice session increments grade session stats", () => {
   setPracticeQuestionProvider({
     pickAny: (grade, avoid, tier) => provider.pickAny(avoid, tier),
     pickBySkill: (grade, skill, avoid, tier) => provider.pickBySkill(skill, avoid, tier),
-    allSkills: (grade) => allGrade12Skills(grade)
+    pickByFamily: (grade, skill, family, avoid, tier) => provider.pickByFamily(skill, family, avoid, tier),
+    allSkills: (grade) => allGrade12Skills(grade),
+    allFamilies: (grade, skill) => provider.allFamilies(skill)
   });
 
   const session = startPracticeSession(profile, 2);
@@ -63,4 +68,31 @@ test("practice session increments grade session stats", () => {
   assert.equal(profile.gradeStats["2"].totalAttempts, 8);
   assert.equal(profile.gradeStats["2"].totalCorrect, 0);
   assert.ok(profile.skills[session.answered[0].skillId]);
+  assert.ok(profile.families[session.answered[0].familyKey]);
+});
+
+test("diagnostic practice rotates across question families", () => {
+  const profile = emptyProfile();
+  const provider = createPracticeProvider(1);
+  setPracticeQuestionProvider({
+    pickAny: (grade, avoid, tier) => provider.pickAny(avoid, tier),
+    pickBySkill: (grade, skill, avoid, tier) => provider.pickBySkill(skill, avoid, tier),
+    pickByFamily: (grade, skill, family, avoid, tier) => provider.pickByFamily(skill, family, avoid, tier),
+    allSkills: (grade) => allGrade12Skills(grade),
+    allFamilies: (grade, skill) => provider.allFamilies(skill)
+  });
+
+  const session = startPracticeSession(profile, 1);
+  const first = nextQuestion(session, profile);
+  recordAttempt(session, profile, first, true, 1200);
+
+  for (let i = 0; i < allGrade12Skills(1).length - 1; i += 1) {
+    const q = nextQuestion(session, profile);
+    recordAttempt(session, profile, q, true, 1200);
+  }
+
+  const repeatedSkill = first.skillId;
+  const secondPass = nextQuestion(session, profile);
+  assert.equal(secondPass.skillId, repeatedSkill);
+  assert.notEqual(secondPass.familyId, first.familyId);
 });

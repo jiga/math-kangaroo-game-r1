@@ -22,7 +22,7 @@ function validateGrade(grade: 1 | 2): void {
     );
 
     const familyCount = Object.keys(stats.byFamily).filter((key) => key.startsWith(`${row.skillId}:`)).length;
-    const minFamilies = row.requiredTemplates >= 8 ? 3 : 2;
+    const minFamilies = row.requiredTemplates >= 8 ? 4 : 3;
     assert(
       familyCount >= minFamilies,
       `Grade ${grade} skill ${row.skillId} has only ${familyCount} families, expected >= ${minFamilies}`

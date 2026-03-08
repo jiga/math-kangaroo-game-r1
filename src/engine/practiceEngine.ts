@@ -1,9 +1,17 @@
-import type { PracticeProfile, PracticeSession, SkillId, QuestionInstance } from "../domain/types";
+import type { PracticeProfile, PracticeSession, SkillId, QuestionInstance, SkillProgress } from "../domain/types";
 
 export interface PracticeQuestionProvider {
   pickAny: (grade: 1 | 2, avoidHashes: Set<string>, pointTier: 3 | 4 | 5) => QuestionInstance;
   pickBySkill: (grade: 1 | 2, skillId: SkillId, avoidHashes: Set<string>, pointTier: 3 | 4 | 5) => QuestionInstance;
+  pickByFamily: (
+    grade: 1 | 2,
+    skillId: SkillId,
+    familyId: string,
+    avoidHashes: Set<string>,
+    pointTier: 3 | 4 | 5
+  ) => QuestionInstance;
   allSkills: (grade: 1 | 2) => SkillId[];
+  allFamilies: (grade: 1 | 2, skillId: SkillId) => string[];
 }
 
 let provider: PracticeQuestionProvider | null = null;
@@ -29,23 +37,56 @@ export function startPracticeSession(profile: PracticeProfile, grade: 1 | 2): Pr
     total: stage === "mock" ? 24 : 24,
     startedAt: Date.now(),
     missesBySkill: {},
+    missesByFamily: {},
     askedQuestionHashes: new Set<string>(),
     answered: []
   };
 }
 
-function weakness(profile: PracticeProfile, skillId: SkillId): number {
-  const s = profile.skills[skillId];
-  if (!s || s.attempts === 0) return 0.5;
-  const acc = s.correct / s.attempts;
+function familyKey(skillId: SkillId, familyId: string): string {
+  return `${skillId}:${familyId}`;
+}
+
+function weakness(progress?: SkillProgress): number {
+  if (!progress || progress.attempts === 0) return 0.55;
+  const acc = progress.correct / progress.attempts;
   return 1 - acc;
 }
 
-function recencyDecay(profile: PracticeProfile, skillId: SkillId): number {
-  const s = profile.skills[skillId];
-  if (!s) return 1;
-  const elapsedHours = (Date.now() - s.lastSeenAt) / (1000 * 60 * 60);
-  return Math.min(1, elapsedHours / 24);
+function recencyDecay(progress?: SkillProgress, horizonHours = 24): number {
+  if (!progress) return 1;
+  const elapsedHours = (Date.now() - progress.lastSeenAt) / (1000 * 60 * 60);
+  return Math.min(1, elapsedHours / horizonHours);
+}
+
+function skillWeakness(profile: PracticeProfile, skillId: SkillId): number {
+  return weakness(profile.skills[skillId]);
+}
+
+function familyWeakness(profile: PracticeProfile, skillId: SkillId, familyId: string): number {
+  return weakness(profile.families[familyKey(skillId, familyId)]);
+}
+
+function skillRecency(profile: PracticeProfile, skillId: SkillId): number {
+  return recencyDecay(profile.skills[skillId], 24);
+}
+
+function familyRecency(profile: PracticeProfile, skillId: SkillId, familyId: string): number {
+  return recencyDecay(profile.families[familyKey(skillId, familyId)], 18);
+}
+
+function dueForReview(progress?: SkillProgress): number {
+  if (!progress) return 0.6;
+  if (progress.nextReviewAt <= Date.now()) return 0.4;
+  return 0;
+}
+
+function dueForSkillReview(profile: PracticeProfile, skillId: SkillId): number {
+  return dueForReview(profile.skills[skillId]);
+}
+
+function dueForFamilyReview(profile: PracticeProfile, skillId: SkillId, familyId: string): number {
+  return dueForReview(profile.families[familyKey(skillId, familyId)]);
 }
 
 function contestWeight(skillId: SkillId): number {
@@ -59,15 +100,12 @@ function contestWeight(skillId: SkillId): number {
   return highValue.includes(skillId) ? 0.35 : 0.15;
 }
 
-function dueForReview(profile: PracticeProfile, skillId: SkillId): number {
-  const s = profile.skills[skillId];
-  if (!s) return 0.6;
-  if (s.nextReviewAt <= Date.now()) return 0.4;
-  return 0;
-}
-
 function recentMissBoost(session: PracticeSession, skillId: SkillId): number {
   return Math.min(0.6, (session.missesBySkill[skillId] || 0) * 0.2);
+}
+
+function recentFamilyMissBoost(session: PracticeSession, key: string): number {
+  return Math.min(0.6, (session.missesByFamily[key] || 0) * 0.2);
 }
 
 function selectMasterySkill(profile: PracticeProfile, session: PracticeSession, grade: 1 | 2): SkillId {
@@ -78,10 +116,10 @@ function selectMasterySkill(profile: PracticeProfile, session: PracticeSession, 
   let bestScore = -Infinity;
   for (const skill of skills) {
     let score =
-      weakness(profile, skill) +
-      recencyDecay(profile, skill) +
+      skillWeakness(profile, skill) +
+      skillRecency(profile, skill) +
       contestWeight(skill) +
-      dueForReview(profile, skill) +
+      dueForSkillReview(profile, skill) +
       recentMissBoost(session, skill);
 
     if (recentSkills.includes(skill)) {
@@ -91,6 +129,37 @@ function selectMasterySkill(profile: PracticeProfile, session: PracticeSession, 
     if (score > bestScore) {
       bestScore = score;
       best = skill;
+    }
+  }
+  return best;
+}
+
+function selectMasteryFamily(
+  profile: PracticeProfile,
+  session: PracticeSession,
+  grade: 1 | 2,
+  skillId: SkillId
+): string {
+  if (!provider) throw new Error("Practice provider not configured");
+  const families = provider.allFamilies(grade, skillId);
+  const recentFamilies = session.answered.slice(-3).map((entry) => entry.familyKey);
+  let best = families[0];
+  let bestScore = -Infinity;
+  for (const familyId of families) {
+    const key = familyKey(skillId, familyId);
+    let score =
+      familyWeakness(profile, skillId, familyId) +
+      familyRecency(profile, skillId, familyId) +
+      dueForFamilyReview(profile, skillId, familyId) +
+      recentFamilyMissBoost(session, key);
+
+    if (recentFamilies.includes(key)) {
+      score -= 0.25;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = familyId;
     }
   }
   return best;
@@ -107,6 +176,8 @@ export function recordAttempt(
   session.answered.push({
     questionId: question.id,
     skillId: question.skillId,
+    familyId: question.familyId,
+    familyKey: familyKey(question.skillId, question.familyId),
     correct: isCorrect,
     responseMs
   });
@@ -114,6 +185,8 @@ export function recordAttempt(
 
   if (!isCorrect) {
     session.missesBySkill[question.skillId] = (session.missesBySkill[question.skillId] || 0) + 1;
+    session.missesByFamily[familyKey(question.skillId, question.familyId)] =
+      (session.missesByFamily[familyKey(question.skillId, question.familyId)] || 0) + 1;
   }
 
   const skill = profile.skills[question.skillId] || {
@@ -131,6 +204,21 @@ export function recordAttempt(
   const intervalMinutes = isCorrect ? Math.min(60 * 24, 15 * Math.max(1, skill.streak)) : 10;
   skill.nextReviewAt = now + intervalMinutes * 60 * 1000;
   profile.skills[question.skillId] = skill;
+
+  const familyProgress = profile.families[familyKey(question.skillId, question.familyId)] || {
+    attempts: 0,
+    correct: 0,
+    streak: 0,
+    lastSeenAt: now,
+    nextReviewAt: now
+  };
+  familyProgress.attempts += 1;
+  familyProgress.correct += isCorrect ? 1 : 0;
+  familyProgress.streak = isCorrect ? familyProgress.streak + 1 : 0;
+  familyProgress.lastSeenAt = now;
+  const familyIntervalMinutes = isCorrect ? Math.min(60 * 24, 12 * Math.max(1, familyProgress.streak)) : 8;
+  familyProgress.nextReviewAt = now + familyIntervalMinutes * 60 * 1000;
+  profile.families[familyKey(question.skillId, question.familyId)] = familyProgress;
 
   const gradeKey = String(session.grade);
   const gradeStat = profile.gradeStats[gradeKey] || { sessions: 0, totalAttempts: 0, totalCorrect: 0 };
@@ -158,7 +246,9 @@ export function nextQuestion(session: PracticeSession, profile: PracticeProfile)
   if (session.stage === "diagnostic") {
     const skills = provider.allSkills(session.grade);
     const skill = skills[session.index % skills.length];
-    const q = provider.pickBySkill(session.grade, skill, session.askedQuestionHashes, pointTier);
+    const families = provider.allFamilies(session.grade, skill);
+    const family = families[Math.floor(session.index / skills.length) % families.length];
+    const q = provider.pickByFamily(session.grade, skill, family, session.askedQuestionHashes, pointTier);
     session.askedQuestionHashes.add(q.variantKey);
     return q;
   }
@@ -170,7 +260,8 @@ export function nextQuestion(session: PracticeSession, profile: PracticeProfile)
   }
 
   const weakSkill = selectMasterySkill(profile, session, session.grade);
-  const candidate = provider.pickBySkill(session.grade, weakSkill, session.askedQuestionHashes, pointTier);
+  const weakFamily = selectMasteryFamily(profile, session, session.grade, weakSkill);
+  const candidate = provider.pickByFamily(session.grade, weakSkill, weakFamily, session.askedQuestionHashes, pointTier);
   session.askedQuestionHashes.add(candidate.variantKey);
   return candidate;
 }

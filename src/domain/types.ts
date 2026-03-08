@@ -100,6 +100,7 @@ export interface PracticeProfile {
   updatedAt: number;
   gradeStats: Record<string, { sessions: number; totalAttempts: number; totalCorrect: number }>;
   skills: Partial<Record<SkillId, SkillProgress>>;
+  families: Partial<Record<string, SkillProgress>>;
   recentQuestionHashes: string[];
 }
 
@@ -113,10 +114,13 @@ export interface PracticeSession {
   total: number;
   startedAt: number;
   missesBySkill: Partial<Record<SkillId, number>>;
+  missesByFamily: Partial<Record<string, number>>;
   askedQuestionHashes: Set<string>;
   answered: Array<{
     questionId: string;
     skillId: SkillId;
+    familyId: string;
+    familyKey: string;
     correct: boolean;
     responseMs: number;
   }>;

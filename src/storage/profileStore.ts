@@ -21,6 +21,7 @@ function emptyProfile(): PracticeProfile {
     updatedAt: now(),
     gradeStats: {},
     skills: {},
+    families: {},
     recentQuestionHashes: []
   };
 }
@@ -49,6 +50,7 @@ function migrateLegacy(raw: unknown): PracticeProfile {
     updatedAt: now(),
     gradeStats: (obj.gradeStats as PracticeProfile["gradeStats"]) || {},
     skills: (obj.skills as PracticeProfile["skills"]) || {},
+    families: (obj.families as PracticeProfile["families"]) || {},
     recentQuestionHashes: Array.isArray(obj.recentQuestionHashes)
       ? (obj.recentQuestionHashes as string[]).slice(-200)
       : []

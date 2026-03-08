@@ -208,13 +208,18 @@ export function buildContestQuestions(grade: Grade, seed = Date.now()): Question
 export function createPracticeProvider(grade: 1 | 2): {
   pickAny: (avoid: Set<string>, pointTier: PointTier) => QuestionInstance;
   pickBySkill: (skillId: SkillId, avoid: Set<string>, pointTier: PointTier) => QuestionInstance;
+  pickByFamily: (skillId: SkillId, familyId: string, avoid: Set<string>, pointTier: PointTier) => QuestionInstance;
+  allFamilies: (skillId: SkillId) => string[];
 } {
   const templates = buildGradeTemplates(grade);
   const rng = new SeededRng(Date.now() + grade * 31);
 
   return {
     pickAny: (avoid, pointTier) => pickTemplate(templates, rng, { pointTier, avoid }),
-    pickBySkill: (skillId, avoid, pointTier) => pickTemplate(templates, rng, { skillId, pointTier, avoid })
+    pickBySkill: (skillId, avoid, pointTier) => pickTemplate(templates, rng, { skillId, pointTier, avoid }),
+    pickByFamily: (skillId, familyId, avoid, pointTier) =>
+      pickTemplate(templates, rng, { skillId, familyId, pointTier, avoid }),
+    allFamilies: (skillId) => familyIdsForSkill(skillId)
   };
 }
 

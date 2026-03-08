@@ -16,7 +16,7 @@ import {
   renderSymmetry,
   renderVenn
 } from "../../render/visualQuestionRenderer";
-import { SeededRng, hashQuestion, shuffledOptions } from "./helpers";
+import { SeededRng, hashQuestion, shuffled, shuffledOptions } from "./helpers";
 
 type DraftQuestion = {
   prompt: string;
@@ -1476,6 +1476,469 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     }
   ]
 };
+
+const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
+  counting_ordering: [
+    {
+      familyId: "before_after_number",
+      generate: (ctx, rng) => {
+        const n = tierNumber(rng, ctx.pointTier, 4, 18, 28);
+        const askBefore = (ctx.variantSeed & 1) === 0;
+        const correct = askBefore ? n - 1 : n + 1;
+        return {
+          prompt: askBefore ? `What number comes just before ${n}?` : `What number comes just after ${n}?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [1, -1, 2, -2]),
+          explanation: askBefore ? `One less than ${n} is ${correct}.` : `One more than ${n} is ${correct}.`,
+          strategyTags: ["move one step only", "check before versus after"],
+          trapWarning: "Before means one less. After means one more."
+        };
+      }
+    }
+  ],
+  compare_number_region: [
+    {
+      familyId: "smallest_number",
+      generate: (ctx, rng) => {
+        const nums = shuffled(
+          [
+            tierNumber(rng, ctx.pointTier, 6, 22, 48),
+            tierNumber(rng, ctx.pointTier, 7, 24, 49),
+            tierNumber(rng, ctx.pointTier, 8, 26, 50)
+          ],
+          rng
+        );
+        const askSmallest = (ctx.variantSeed & 1) === 0;
+        const correct = askSmallest ? String(Math.min(...nums)) : String(Math.max(...nums));
+        return {
+          prompt: `Which number is ${askSmallest ? "smallest" : "greatest"}: ${nums.join(", ")}?`,
+          correct,
+          distractors: textDistractors(correct, nums.map(String)),
+          explanation: `${correct} is the ${askSmallest ? "smallest" : "greatest"} when you compare the tens first, then the ones.`,
+          strategyTags: ["compare tens before ones", "scan all choices once"],
+          trapWarning: "Do not stop after checking only the first two numbers."
+        };
+      }
+    }
+  ],
+  ordinal_numbers: [
+    {
+      familyId: "move_to_front",
+      generate: (_ctx, rng) => {
+        const names = ["Mia", "Ben", "Ava", "Leo", "Zoe"];
+        const moved = names[names.length - 1];
+        const line = [moved, ...names.slice(0, -1)];
+        const place = rng.int(2, 4);
+        const correct = line[place - 1];
+        return {
+          prompt: `${names.join(", ")} stand in a line. ${moved} moves to the front. Who is ${ordinalWord(place)} now?`,
+          correct,
+          distractors: textDistractors(correct, names),
+          explanation: `After ${moved} goes to the front, the new order is ${line.join(", ")}, so ${correct} is ${ordinalWord(place)}.`,
+          strategyTags: ["update the order first", "then count positions"],
+          trapWarning: "Do not use the old order after someone moves."
+        };
+      }
+    }
+  ],
+  place_value: [
+    {
+      familyId: "expanded_form",
+      generate: (ctx, rng) => {
+        const tens = tierNumber(rng, ctx.pointTier, 1, 5, 9);
+        const ones = rng.int(0, 9);
+        const correct = tens * 10 + ones;
+        return {
+          prompt: `Which number is ${tens} tens and ${ones} ones?`,
+          correct: String(correct),
+          distractors: textDistractors(String(correct), [
+            String(tens + ones),
+            String(ones * 10 + tens),
+            String(tens * 10),
+            String(correct + 10)
+          ]),
+          explanation: `${tens} tens make ${tens * 10}. Add ${ones} ones to get ${correct}.`,
+          strategyTags: ["build tens first", "add ones second"],
+          trapWarning: "Do not reverse the tens digit and the ones digit."
+        };
+      }
+    }
+  ],
+  single_digit_add_sub: [
+    {
+      familyId: "make_ten_bridge",
+      generate: (_ctx, rng) => {
+        const a = rng.int(6, 9);
+        const b = rng.int(4, 8);
+        const toTen = 10 - a;
+        const left = b - toTen;
+        const correct = a + b;
+        return {
+          prompt: `What is ${a} + ${b}?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [1, -1, 2, -2]),
+          explanation: `Make 10 first: ${a} + ${toTen} = 10, then add ${left} more to get ${correct}.`,
+          strategyTags: ["make 10 first", "split the second number"],
+          trapWarning: "Do not add all the ones at once if making 10 is faster."
+        };
+      }
+    }
+  ],
+  number_line: [
+    {
+      familyId: "number_between",
+      generate: (ctx, rng) => {
+        const start = tierNumber(rng, ctx.pointTier, 2, 14, 34);
+        const gap = ctx.pointTier === 5 ? 2 : 1;
+        const correct = start + gap;
+        return {
+          prompt: `Which number is between ${start} and ${start + gap * 2}?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [gap, -gap, gap * 2, -gap * 2]),
+          explanation: `The number exactly between ${start} and ${start + gap * 2} is ${correct}.`,
+          strategyTags: ["count one jump at a time", "find the middle point"],
+          trapWarning: "Between means not the first number and not the last number."
+        };
+      }
+    }
+  ],
+  fractions_words: [
+    {
+      familyId: "equal_shares_story",
+      generate: (_ctx, rng) => {
+        const people = shuffled([2, 3, 4], rng)[0];
+        const each = rng.int(2, 5);
+        const total = people * each;
+        return {
+          prompt: `${people} children share ${total} stickers equally. How many stickers does each child get?`,
+          correct: String(each),
+          distractors: numericDistractors(each, [1, -1, people, -people], 1),
+          explanation: `Equal shares means divide ${total} into ${people} equal groups. Each group has ${each}.`,
+          strategyTags: ["split into equal groups", "check that all shares match"],
+          trapWarning: "Fractions only work when the shares are equal."
+        };
+      }
+    }
+  ],
+  sorting_classifying: [
+    {
+      familyId: "belongs_to_group",
+      generate: () => {
+        const correct = "red circle";
+        return {
+          prompt: "Lina's box can have only red things or square things. Which item can be in Lina's box?",
+          correct,
+          distractors: textDistractors(correct, ["blue triangle", "green oval", "yellow star", "blue circle"]),
+          explanation: `A red circle fits because it is red. The others are not red and not square.`,
+          strategyTags: ["test the rule on each choice", "keep the word or in mind"],
+          trapWarning: "Or means a choice can satisfy one rule and still be allowed."
+        };
+      }
+    }
+  ],
+  measurement_small: [
+    {
+      familyId: "length_difference",
+      generate: (ctx, rng) => {
+        const longer = tierNumber(rng, ctx.pointTier, 8, 15, 24);
+        const shorter = rng.int(3, longer - 2);
+        const correct = longer - shorter;
+        return {
+          prompt: `Ribbon A is ${longer} cm long. Ribbon B is ${shorter} cm long. How many centimeters longer is Ribbon A?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [1, -1, shorter, -shorter], 1),
+          explanation: `To find how many longer, subtract ${shorter} from ${longer}. The difference is ${correct}.`,
+          strategyTags: ["subtract to compare", "keep the unit the same"],
+          trapWarning: "Longer by means difference, not total length together."
+        };
+      }
+    }
+  ],
+  patterns: [
+    {
+      familyId: "repeat_number_pattern",
+      generate: (_ctx, rng) => {
+        const a = rng.int(2, 8);
+        const b = a + rng.int(1, 4);
+        const values = [a, b, a, b];
+        const correct = a;
+        return {
+          prompt: `What comes next? ${values.join(", ")}, ?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [1, -1, b - a, a - b]),
+          explanation: `The pattern repeats ${a}, ${b}, ${a}, ${b}, so the next number is ${a}.`,
+          strategyTags: ["look for the repeat block", "say the pattern twice"],
+          trapWarning: "A repeating pattern starts again after the full block."
+        };
+      }
+    }
+  ],
+  perimeter_broken_lines: [
+    {
+      familyId: "compare_path_lengths",
+      generate: (_ctx, rng) => {
+        const pathA = [rng.int(2, 5), rng.int(2, 5)];
+        const pathB = [rng.int(2, 5), rng.int(2, 5)];
+        const totalA = pathA[0] + pathA[1];
+        const totalB = pathB[0] + pathB[1];
+        const correct = totalA === totalB ? "Equal" : totalA > totalB ? "Path A" : "Path B";
+        return {
+          prompt: `Path A is ${pathA[0]} cm + ${pathA[1]} cm. Path B is ${pathB[0]} cm + ${pathB[1]} cm. Which path is longer?`,
+          correct,
+          distractors: textDistractors(correct, ["Path A", "Path B", "Equal", "Cannot tell"]),
+          explanation:
+            totalA === totalB
+              ? `Both paths total ${totalA} cm, so they are equal.`
+              : `${Math.max(totalA, totalB)} cm is longer, so ${correct} is longer.`,
+          strategyTags: ["add each path first", "compare totals second"],
+          trapWarning: "Do not compare one segment from each path by itself."
+        };
+      }
+    }
+  ],
+  relative_position: [
+    {
+      familyId: "between_objects",
+      generate: () => {
+        const order = ["Mia", "Ben", "Ava", "Leo"];
+        return {
+          prompt: `${order.join(", ")} sit in that order. Who sits between Ben and Leo?`,
+          correct: "Ava",
+          distractors: textDistractors("Ava", order),
+          explanation: `Ava is the only one between Ben and Leo in the order.`,
+          strategyTags: ["read the whole order", "look at neighbors only"],
+          trapWarning: "Between means directly in the middle of the two named objects."
+        };
+      }
+    }
+  ],
+  shape_properties: [
+    {
+      familyId: "equal_sides_shape",
+      generate: () => {
+        return {
+          prompt: "Which shape always has 4 equal sides and 4 corners?",
+          correct: "square",
+          distractors: textDistractors("square", ["rectangle", "triangle", "circle", "pentagon"]),
+          explanation: "A square always has 4 equal sides and 4 corners.",
+          strategyTags: ["use side lengths and corners", "match both properties"],
+          trapWarning: "A rectangle has 4 corners, but its sides are not all equal."
+        };
+      }
+    }
+  ],
+  maze_shape_puzzles: [
+    {
+      familyId: "right_turns_only",
+      format: "svg",
+      generate: (_ctx, rng) => {
+        const leftTurns = rng.int(1, 3);
+        const rightTurns = rng.int(1, 3);
+        return {
+          prompt: "How many right turns does the path make?",
+          correct: String(rightTurns),
+          distractors: numericDistractors(rightTurns, [1, -1, leftTurns - rightTurns, 2], 0),
+          explanation: `Count only the turns to the right. There are ${rightTurns}.`,
+          strategyTags: ["track only right turns", "ignore left turns for this question"],
+          trapWarning: "Do not count all turns when the question asks for right turns only.",
+          format: "svg",
+          visualAssetSpec: renderMaze(rng.int(1, 999), { leftTurns, rightTurns })
+        };
+      }
+    }
+  ],
+  cube_cuboid_visualization: [
+    {
+      familyId: "hidden_marks_total",
+      format: "svg",
+      generate: (_ctx, rng) => {
+        const visible = rng.int(2, 4);
+        const total = visible + rng.int(1, 2);
+        const correct = total - visible;
+        return {
+          prompt: `The cube has ${total} marked faces in all. ${visible} marks can be seen. How many marked faces are hidden?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [1, -1, visible, -visible], 0),
+          explanation: `Subtract the ${visible} visible marks from the ${total} total marks. ${correct} marked face(s) are hidden.`,
+          strategyTags: ["total minus visible", "picture the back faces"],
+          trapWarning: "Visible faces are only part of the whole cube.",
+          format: "svg",
+          visualAssetSpec: renderCube(visible)
+        };
+      }
+    }
+  ],
+  likelihood_vocabulary: [
+    {
+      familyId: "most_likely_color",
+      generate: (_ctx, rng) => {
+        const counts = [
+          ["red", rng.int(3, 5)],
+          ["blue", rng.int(1, 2)],
+          ["green", rng.int(1, 2)]
+        ] as const;
+        const correct = counts.reduce((best, row) => (row[1] > best[1] ? row : best))[0];
+        return {
+          prompt: `A bag has ${counts[0][1]} red, ${counts[1][1]} blue, and ${counts[2][1]} green marbles. Which color is most likely to be picked?`,
+          correct,
+          distractors: textDistractors(correct, counts.map(([color]) => color)),
+          explanation: `${correct} has the most marbles, so it is most likely.`,
+          strategyTags: ["most likely means biggest count", "compare all outcomes"],
+          trapWarning: "Do not choose a color just because you like it; use the counts."
+        };
+      }
+    }
+  ],
+  pictographs_bar_graphs: [
+    {
+      familyId: "total_all_rows",
+      format: "svg",
+      generate: (_ctx, rng) => {
+        const groups = [rng.int(2, 4), rng.int(1, 3), rng.int(2, 5)];
+        const valuePerIcon = (rng.int(0, 1) === 0 ? 1 : 2) as 1 | 2;
+        const correct = groups.reduce((sum, count) => sum + count * valuePerIcon, 0);
+        return {
+          prompt: "How many items are shown altogether?",
+          correct: String(correct),
+          distractors: numericDistractors(correct, [valuePerIcon, -valuePerIcon, groups.length, -groups.length], 0),
+          explanation: `Add the value of every row. The total is ${correct}.`,
+          strategyTags: ["read the legend first", "add all rows once"],
+          trapWarning: "Multiply each icon by the legend value before adding.",
+          format: "svg",
+          visualAssetSpec: renderPictograph(groups, { labels: ["A", "B", "C"], valuePerIcon })
+        };
+      }
+    }
+  ],
+  venn_diagrams_easy: [
+    {
+      familyId: "outside_both",
+      format: "svg",
+      generate: (_ctx, rng) => {
+        const aOnly = rng.int(1, 4);
+        const both = rng.int(1, 3);
+        const bOnly = rng.int(1, 4);
+        const outside = rng.int(1, 4);
+        const total = aOnly + both + bOnly + outside;
+        return {
+          prompt: `There are ${total} children in all. How many are outside both circles?`,
+          correct: String(outside),
+          distractors: numericDistractors(outside, [1, -1, both, -both], 0),
+          explanation: `Add the numbers inside the circles first. The remaining children, ${outside}, are outside both circles.`,
+          strategyTags: ["inside first, outside after", "use total minus shown"],
+          trapWarning: "Outside both is not part of either circle.",
+          format: "svg",
+          visualAssetSpec: renderVenn(aOnly, both, bOnly)
+        };
+      }
+    }
+  ],
+  calendar: [
+    {
+      familyId: "weekday_after_days",
+      generate: (_ctx, rng) => {
+        const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        const startIndex = rng.int(0, days.length - 1);
+        const jump = rng.int(1, 9);
+        const correct = days[(startIndex + jump) % days.length];
+        return {
+          prompt: `If today is ${days[startIndex]}, what day will it be in ${jump} day(s)?`,
+          correct,
+          distractors: textDistractors(correct, days),
+          explanation: `Move forward ${jump} days through the 7-day cycle. You land on ${correct}.`,
+          strategyTags: ["use the cycle of 7", "count jumps not the start day"],
+          trapWarning: "Do not count today as day 1 unless the question says after one day."
+        };
+      }
+    }
+  ],
+  money_small: [
+    {
+      familyId: "change_from_coin",
+      generate: (_ctx, rng) => {
+        const coin = shuffled([10, 25, 50], rng)[0];
+        const cost = rng.int(coin === 10 ? 1 : 6, coin - 2);
+        const correct = coin - cost;
+        return {
+          prompt: `You pay with ${coin} cents for something that costs ${cost} cents. How many cents change do you get?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [1, -1, cost, -cost], 0),
+          explanation: `Change is money back. Subtract ${cost} from ${coin} to get ${correct}.`,
+          strategyTags: ["bigger amount minus cost", "keep everything in cents"],
+          trapWarning: "Do not add the cost and the coin value."
+        };
+      }
+    }
+  ],
+  clock_full_half: [
+    {
+      familyId: "hour_later",
+      generate: (_ctx, rng) => {
+        const hour = rng.int(1, 11);
+        const half = (rng.int(0, 1) === 0);
+        const start = `${hour}:${half ? "30" : "00"}`;
+        const nextHour = hour === 12 ? 1 : hour + 1;
+        const correct = `${nextHour}:${half ? "30" : "00"}`;
+        return {
+          prompt: `The time is ${start}. What time is 1 hour later?`,
+          correct,
+          distractors: textDistractors(correct, [
+            `${hour}:${half ? "30" : "00"}`,
+            `${nextHour}:${half ? "00" : "30"}`,
+            `${hour + 2 > 12 ? hour - 10 : hour + 2}:${half ? "30" : "00"}`
+          ]),
+          explanation: `One hour later keeps the minutes the same. ${start} becomes ${correct}.`,
+          strategyTags: ["keep the minutes fixed", "move the hour by one"],
+          trapWarning: "A full hour later does not change :00 to :30 or :30 to :00."
+        };
+      }
+    }
+  ],
+  symmetry_rotation: [
+    {
+      familyId: "letter_vertical_symmetry",
+      generate: (_ctx, rng) => {
+        const sets = [
+          ["A", "R", "F", "G", "P"],
+          ["M", "K", "L", "S", "R"],
+          ["T", "N", "E", "G", "J"]
+        ];
+        const options = shuffled(sets, rng)[0];
+        const correct = options[0];
+        return {
+          prompt: "Which capital letter has a vertical line of symmetry?",
+          correct,
+          distractors: textDistractors(correct, options),
+          explanation: `${correct} can be folded down the middle so both sides match.`,
+          strategyTags: ["imagine folding down the middle", "match left and right halves"],
+          trapWarning: "Rotation and symmetry are not the same idea."
+        };
+      }
+    }
+  ],
+  prealgebra_balance: [
+    {
+      familyId: "missing_subtrahend",
+      generate: (_ctx, rng) => {
+        const answer = rng.int(1, 8);
+        const total = answer + rng.int(1, 8);
+        const correct = total - answer;
+        return {
+          prompt: `${total} - □ = ${answer}. What number goes in the box?`,
+          correct: String(correct),
+          distractors: numericDistractors(correct, [1, -1, answer, -answer], 0),
+          explanation: `The missing number is what you subtract from ${total} to get ${answer}. That number is ${correct}.`,
+          strategyTags: ["think of the matching addition fact", "check with subtraction"],
+          trapWarning: "The box is not the answer on the right side; it is the amount taken away."
+        };
+      }
+    }
+  ]
+};
+
+for (const [skillId, families] of Object.entries(ADDITIONAL_FAMILIES) as Array<[SkillId, QuestionFamily[]]>) {
+  FAMILY_LIBRARY[skillId].push(...families);
+}
 
 export function familyIdsForSkill(skillId: SkillId): string[] {
   return FAMILY_LIBRARY[skillId].map((family) => family.familyId);
