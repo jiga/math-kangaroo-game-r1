@@ -498,7 +498,7 @@ h2 {
 
 .coach-status {
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1.2;
   color: var(--muted);
 }
@@ -517,10 +517,25 @@ h2 {
   font-size: 9px;
 }
 
+.coach-visual {
+  margin-top: 6px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent 30%);
+  background: color-mix(in srgb, var(--option-bg) 88%, #fff 12%);
+  overflow: hidden;
+}
+
+.coach-visual svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .coach-body {
   margin: 6px 0 8px;
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1.25;
   color: var(--text);
   flex: 1;
@@ -573,6 +588,10 @@ body[data-compact-height="true"] .learn-panel {
 
 body[data-compact-height="true"] .learn-visual {
   min-height: 48px;
+}
+
+body[data-compact-height="true"] .coach-visual {
+  min-height: 40px;
 }
 
 body[data-compact-height="true"] .question-visual[data-kind="broken_line"] svg,

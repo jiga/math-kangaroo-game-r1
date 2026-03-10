@@ -6,6 +6,7 @@ import { getDeterministicCoach } from "../coach/deterministicCoach";
 import { TTSQueue } from "../audio/ttsQueue";
 import { loadProfile, loadProfileAsync, saveProfileAsync } from "../storage/profileStore";
 import { buildConceptLab, type ConceptLabFlow } from "../learn/conceptLab";
+import { renderLessonScene } from "../render/visualQuestionRenderer";
 import {
   finalizePracticeSession,
   nextQuestion,
@@ -688,11 +689,20 @@ function renderHelpOverlay(question: QuestionInstance): void {
   const body = qs<HTMLElement>("#coach-body");
   const status = qs<HTMLElement>("#coach-status");
   const sayButton = qs<HTMLButtonElement>("#coach-say");
+  const visual = qs<HTMLElement>("#coach-visual");
   const view = buildHelpView(question, state.helpMode);
+  const visualSpec =
+    state.helpMode === "explain"
+      ? question.visualAssetSpec || renderLessonScene(question.skillId, 3)
+      : state.helpMode === "steps"
+        ? question.visualAssetSpec || renderLessonScene(question.skillId, 2)
+        : renderLessonScene(question.skillId, 1);
 
   title.textContent = view.title;
   body.textContent = view.body;
   body.scrollTop = 0;
+  visual.innerHTML = visualSpec.svg;
+  visual.setAttribute("aria-label", visualSpec.altText);
   status.textContent = view.canSpeak
     ? "Tap SAY IT or press the side button."
     : "Answer first to unlock WHY.";

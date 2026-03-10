@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import {
   renderBrokenLine,
   renderCube,
+  renderLessonScene,
   renderMaze,
   renderPictograph,
   renderRegionCompare,
   renderSymmetry,
   renderVenn
 } from "../src/render/visualQuestionRenderer";
+import { allSkillBlueprints } from "../src/learn/conceptLab";
 
 const checks = [
   renderMaze(4, { leftTurns: 2, rightTurns: 1 }),
@@ -34,4 +36,13 @@ test("pictograph legend and path metadata are included when needed", () => {
   assert.ok(pictograph.svg.includes("1 star = 5"));
   assert.ok(maze.altText.includes("left turns"));
   assert.ok(maze.svg.includes("START"));
+});
+
+test("every Grade 1-2 skill gets a specific concept scene", () => {
+  for (const skill of allSkillBlueprints()) {
+    const scene = renderLessonScene(skill, 7);
+    assert.ok(scene.altText.length > 6);
+    assert.notEqual(scene.altText, "General lesson card");
+    assert.ok(!scene.svg.includes("Read. Picture. Solve."));
+  }
 });
