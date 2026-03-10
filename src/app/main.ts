@@ -5,7 +5,7 @@ import { buildLegacyContestQuestions, totalQuestionsForGrade } from "../legacy/g
 import { getDeterministicCoach } from "../coach/deterministicCoach";
 import { TTSQueue } from "../audio/ttsQueue";
 import { loadProfile, loadProfileAsync, saveProfileAsync } from "../storage/profileStore";
-import { renderLessonScene } from "../render/visualQuestionRenderer";
+import { buildConceptLab, type ConceptLabFlow } from "../learn/conceptLab";
 import {
   finalizePracticeSession,
   nextQuestion,
@@ -55,14 +55,17 @@ const state: {
   practiceSession: PracticeSession | null;
   profile: ReturnType<typeof loadProfile>;
   stageLabel: string;
-  coachFromWrong: boolean;
   helpMode: HelpMode;
   answeredCurrent: boolean;
   lastAnswerCorrect: boolean | null;
-  learnAutoTimer: number | null;
   learnActive: boolean;
   learnStepIndex: number;
-  learnSteps: Array<{ title: string; body: string; visualSvg: string; visualAlt: string }>;
+  learnFlow: ConceptLabFlow | null;
+  learnStepResolved: boolean;
+  learnStepAttempts: number;
+  learnFeedback: string;
+  learnFeedbackTone: "good" | "retry" | "";
+  learnSelectedIndex: number | null;
 } = {
   theme: "neon",
   grade: 1,
@@ -82,14 +85,17 @@ const state: {
   practiceSession: null,
   profile: loadProfile(),
   stageLabel: "",
-  coachFromWrong: false,
   helpMode: "hint",
   answeredCurrent: false,
   lastAnswerCorrect: null,
-  learnAutoTimer: null,
   learnActive: false,
   learnStepIndex: 0,
-  learnSteps: []
+  learnFlow: null,
+  learnStepResolved: true,
+  learnStepAttempts: 0,
+  learnFeedback: "",
+  learnFeedbackTone: "",
+  learnSelectedIndex: null
 };
 
 function qs<T extends Element>(selector: string): T {
@@ -164,7 +170,7 @@ function buildGradeButtons(): void {
 
 function setMode(mode: GameMode): void {
   state.mode = mode;
-  for (const button of document.querySelectorAll<HTMLButtonElement>(".btn-mode")) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-mode]")) {
     button.classList.toggle("active", button.dataset.mode === mode);
   }
   updateModeInfo();
@@ -176,9 +182,9 @@ function updateModeInfo(): void {
   if (state.mode === "contest") {
     info = `Contest · ${state.grade <= 4 ? 24 : 30} Q · 75 min · 3/4/5 points`;
   } else if (state.mode === "learn") {
-    info = `Learn · ${total} Q · Guided scenes + voice + coach`;
+    info = `Learn · ${total} Q · Concept lab + checks + transfer`;
   } else {
-    info = `Practice · ${total} Q · Adaptive (Diagnostic -> Mastery -> Mock)`;
+    info = `Practice · ${total} Q · Adaptive + fix-the-miss drills`;
   }
   qs<HTMLParagraphElement>("#mode-info").textContent = info;
 }
@@ -190,12 +196,7 @@ function clearTimer(): void {
   }
 }
 
-function clearLearnTimer(): void {
-  if (state.learnAutoTimer !== null) {
-    window.clearTimeout(state.learnAutoTimer);
-    state.learnAutoTimer = null;
-  }
-}
+function clearLearnTimer(): void {}
 
 function setOptionsEnabled(enabled: boolean): void {
   for (const opt of document.querySelectorAll<HTMLButtonElement>(".option")) {
@@ -203,14 +204,30 @@ function setOptionsEnabled(enabled: boolean): void {
   }
 }
 
+function setQuestionSolveView(hidden: boolean): void {
+  qs<HTMLElement>("#question-text").style.display = hidden ? "none" : "block";
+  const visual = qs<HTMLElement>("#question-visual");
+  visual.style.display = hidden ? "none" : visual.dataset.hasVisual === "true" ? "block" : "none";
+  qs<HTMLElement>("#options").style.display = hidden ? "none" : "grid";
+}
+
 function hideLearnPanel(): void {
   clearLearnTimer();
   state.learnActive = false;
   state.learnStepIndex = 0;
-  state.learnSteps = [];
+  state.learnFlow = null;
+  state.learnStepResolved = true;
+  state.learnStepAttempts = 0;
+  state.learnFeedback = "";
+  state.learnFeedbackTone = "";
+  state.learnSelectedIndex = null;
   const panel = qs<HTMLElement>("#learn-panel");
   panel.hidden = true;
   qs<HTMLElement>("#learn-visual").innerHTML = "";
+  qs<HTMLElement>("#learn-step-prompt").hidden = true;
+  qs<HTMLElement>("#learn-options").hidden = true;
+  qs<HTMLElement>("#learn-feedback").hidden = true;
+  setQuestionSolveView(false);
 }
 
 function totalQuestionsInRun(): number {
@@ -451,64 +468,158 @@ function bindScrollableFallbacks(): void {
 }
 
 function applyLearnStep(): void {
-  if (!state.learnActive || !state.learnSteps.length) return;
-  const step = state.learnSteps[state.learnStepIndex];
+  if (!state.learnActive || !state.learnFlow?.steps.length) return;
+  const card = qs<HTMLElement>(".question-card");
+  card.scrollTop = 0;
+  setPreferredScrollTarget(card);
+  const step = state.learnFlow.steps[state.learnStepIndex];
   qs<HTMLElement>("#learn-step-title").textContent = step.title;
-  qs<HTMLElement>("#learn-step-index").textContent = `${state.learnStepIndex + 1}/${state.learnSteps.length}`;
+  qs<HTMLElement>("#learn-step-index").textContent = `${state.learnStepIndex + 1}/${state.learnFlow.steps.length}`;
+  qs<HTMLElement>("#learn-objective").textContent = step.objective;
   qs<HTMLElement>("#learn-step-body").textContent = step.body;
   const learnVisual = qs<HTMLElement>("#learn-visual");
   learnVisual.innerHTML = step.visualSvg;
   learnVisual.setAttribute("aria-label", step.visualAlt);
-  qs<HTMLElement>("#learn-progress-fill").style.width = `${((state.learnStepIndex + 1) / state.learnSteps.length) * 100}%`;
-  qs<HTMLButtonElement>("#learn-next").textContent =
-    state.learnStepIndex === state.learnSteps.length - 1 ? "START" : "NEXT";
+  qs<HTMLElement>("#learn-progress-fill").style.width = `${((state.learnStepIndex + 1) / state.learnFlow.steps.length) * 100}%`;
+
+  const prompt = qs<HTMLElement>("#learn-step-prompt");
+  const options = qs<HTMLElement>("#learn-options");
+  const feedback = qs<HTMLElement>("#learn-feedback");
+  feedback.hidden = !state.learnFeedback;
+  feedback.textContent = state.learnFeedback;
+  feedback.className = `learn-feedback${state.learnFeedbackTone ? ` ${state.learnFeedbackTone}` : ""}`;
+
+  if (step.kind === "check" && step.options && typeof step.correctIndex === "number") {
+    prompt.hidden = false;
+    prompt.textContent = step.prompt || "";
+    options.hidden = false;
+    options.innerHTML = "";
+    step.options.forEach((option, index) => {
+      const button = document.createElement("button");
+      button.className = "learn-option";
+      if (index === 2) button.classList.add("learn-option-wide");
+      if (state.learnSelectedIndex === index && state.learnFeedbackTone === "retry") button.classList.add("wrong");
+      if (state.learnStepResolved && index === step.correctIndex) button.classList.add("correct");
+      button.textContent = option;
+      button.disabled = state.learnStepResolved;
+      button.addEventListener("click", () => onLearnChoice(index));
+      options.appendChild(button);
+    });
+  } else {
+    prompt.hidden = true;
+    options.hidden = true;
+    options.innerHTML = "";
+  }
+
+  const nextButton = qs<HTMLButtonElement>("#learn-next");
+  const isLast = state.learnStepIndex === state.learnFlow.steps.length - 1;
+  nextButton.textContent = isLast
+    ? state.learnFlow.mode === "remediation"
+      ? "CONTINUE"
+      : "START"
+    : "NEXT";
+  nextButton.disabled = step.kind === "check" && !state.learnStepResolved;
+  qs<HTMLButtonElement>("#learn-skip").textContent = state.learnFlow.mode === "remediation" ? "SKIP FIX" : "SKIP LAB";
+}
+
+function currentLearnStep() {
+  if (!state.learnActive || !state.learnFlow) return null;
+  return state.learnFlow.steps[state.learnStepIndex] || null;
+}
+
+function speakCurrentLearnStep(): void {
+  const step = currentLearnStep();
+  if (!step) return;
+  speakCoach(step.speakText);
+}
+
+function onLearnChoice(index: number): void {
+  const step = currentLearnStep();
+  if (!step || step.kind !== "check" || !step.options || typeof step.correctIndex !== "number") return;
+
+  state.learnStepAttempts += 1;
+  state.learnSelectedIndex = index;
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>(".learn-option")];
+  buttons.forEach((button) => (button.disabled = true));
+
+  if (index === step.correctIndex) {
+    buttons[index]?.classList.add("correct");
+    state.learnStepResolved = true;
+    state.learnFeedback = step.successText || "Correct.";
+    state.learnFeedbackTone = "good";
+  } else {
+    buttons[index]?.classList.add("wrong");
+    buttons[step.correctIndex]?.classList.add("correct");
+    const maxAttempts = step.maxAttempts || 2;
+    state.learnStepResolved = state.learnStepAttempts >= maxAttempts;
+    state.learnFeedback = state.learnStepResolved
+      ? step.wrongText || "Use the pattern shown and move on."
+      : `${step.wrongText || "Try once more."} Try once more.`;
+    state.learnFeedbackTone = "retry";
+  }
+
+  applyLearnStep();
 }
 
 function finishLearnFlow(): void {
   clearLearnTimer();
+  const wasRemediation = state.learnFlow?.mode === "remediation";
   state.learnActive = false;
+  state.learnFlow = null;
+  state.learnStepResolved = true;
+  state.learnStepAttempts = 0;
+  state.learnFeedback = "";
+  state.learnFeedbackTone = "";
+  state.learnSelectedIndex = null;
   qs<HTMLElement>("#learn-panel").hidden = true;
   setOptionsEnabled(true);
   resumeQuestionClock();
+  if (wasRemediation) {
+    window.setTimeout(next, 180);
+  }
 }
 
 function advanceLearnStep(): void {
   if (!state.learnActive) return;
-  clearLearnTimer();
-  if (state.learnStepIndex >= state.learnSteps.length - 1) {
+  const step = currentLearnStep();
+  if (step?.kind === "check" && !state.learnStepResolved) return;
+  if (!state.learnFlow || state.learnStepIndex >= state.learnFlow.steps.length - 1) {
     finishLearnFlow();
     return;
   }
   state.learnStepIndex += 1;
+  state.learnStepResolved = currentLearnStep()?.kind !== "check";
+  state.learnStepAttempts = 0;
+  state.learnFeedback = "";
+  state.learnFeedbackTone = "";
+  state.learnSelectedIndex = null;
   applyLearnStep();
-  state.learnAutoTimer = window.setTimeout(advanceLearnStep, 2600);
 }
 
-function startLearnFlow(question: QuestionInstance): void {
+function startLabFlow(question: QuestionInstance, mode: "learn" | "remediation"): void {
   clearLearnTimer();
   pauseQuestionClock();
   const coach = getDeterministicCoach(question, false);
-  const conceptScene = renderLessonScene(question.skillId, state.learnStepIndex + 1);
-  const exampleScene = question.visualAssetSpec || renderLessonScene(question.skillId, state.learnStepIndex + 2);
-  const speedScene = renderLessonScene(question.skillId, state.learnStepIndex + 3);
-  const strategyText = question.strategyTags.length
-    ? `${coach.hint} Focus on ${question.strategyTags.slice(0, 2).join(" and ")}.`
-    : coach.hint;
-  const trapText = question.trapWarning
-    ? `${question.trapWarning} ${coach.errorDiagnosis}`
-    : coach.errorDiagnosis;
-  const workedText = `${coach.miniExample} ${coach.speedTactic}`;
-  state.learnSteps = [
-    { title: "Strategy", body: strategyText, visualSvg: conceptScene.svg, visualAlt: conceptScene.altText },
-    { title: "Spot The Trap", body: trapText, visualSvg: exampleScene.svg, visualAlt: exampleScene.altText },
-    { title: "Worked Move", body: workedText, visualSvg: speedScene.svg, visualAlt: speedScene.altText }
-  ];
+  state.learnFlow = buildConceptLab(question, coach, mode);
   state.learnStepIndex = 0;
   state.learnActive = true;
+  state.learnStepResolved = state.learnFlow.steps[0]?.kind !== "check";
+  state.learnStepAttempts = 0;
+  state.learnFeedback = "";
+  state.learnFeedbackTone = "";
+  state.learnSelectedIndex = null;
   qs<HTMLElement>("#learn-panel").hidden = false;
+  setQuestionSolveView(true);
   setOptionsEnabled(false);
   applyLearnStep();
-  state.learnAutoTimer = window.setTimeout(advanceLearnStep, 2600);
+}
+
+function startLearnFlow(question: QuestionInstance): void {
+  startLabFlow(question, "learn");
+}
+
+function startRemediationFlow(question: QuestionInstance): void {
+  startLabFlow(question, "remediation");
 }
 
 function renderQuestion(): void {
@@ -543,11 +654,13 @@ function renderQuestion(): void {
     visual.innerHTML = q.visualAssetSpec.svg;
     visual.setAttribute("aria-label", q.visualAssetSpec.altText);
     visual.dataset.kind = q.visualAssetSpec.kind;
+    visual.dataset.hasVisual = "true";
     visual.style.display = "block";
   } else {
     visual.innerHTML = "";
     visual.removeAttribute("aria-label");
     delete visual.dataset.kind;
+    visual.dataset.hasVisual = "false";
     visual.style.display = "none";
   }
 
@@ -682,8 +795,7 @@ function onAnswer(index: number, button: HTMLButtonElement): void {
   qs<HTMLElement>("#hud-points").textContent = String(state.score);
 
   if ((state.mode === "practice" || state.mode === "learn") && !isCorrect) {
-    state.coachFromWrong = true;
-    void showCoach(q, "explain");
+    startRemediationFlow(q);
     return;
   }
 
@@ -734,7 +846,6 @@ function startGame(): void {
   state.correct = 0;
   state.locked = false;
   state.startedAtMs = Date.now();
-  state.coachFromWrong = false;
   state.helpMode = "hint";
   state.answeredCurrent = false;
   state.lastAnswerCorrect = null;
@@ -816,6 +927,9 @@ function renderAppToText(): string {
     total: totalQuestionsInRun(),
     question: question?.prompt || "",
     options: question?.options || [],
+    learnActive: state.learnActive,
+    learnStep: currentLearnStep()?.title || "",
+    learnPrompt: currentLearnStep()?.prompt || "",
     helpOpen: qs<HTMLElement>("#coach-overlay").classList.contains("active"),
     scrollTop: scrollTarget?.scrollTop ?? 0,
     scrollHeight: scrollTarget?.scrollHeight ?? 0,
@@ -839,7 +953,7 @@ function wireUi(): void {
     button.addEventListener("click", () => theme((button.dataset.theme || "neon") as "neon" | "gameboy"));
   }
 
-  for (const button of document.querySelectorAll<HTMLButtonElement>(".btn-mode")) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-mode]")) {
     button.addEventListener("click", () => setMode((button.dataset.mode || "contest") as GameMode));
   }
 
@@ -856,10 +970,6 @@ function wireUi(): void {
 
   qs<HTMLButtonElement>("#coach-continue").addEventListener("click", () => {
     hideCoach();
-    if (state.coachFromWrong) {
-      state.coachFromWrong = false;
-      next();
-    }
   });
 
   qs<HTMLButtonElement>("#learn-next").addEventListener("click", () => {
@@ -891,6 +1001,10 @@ function wireUi(): void {
   window.addEventListener("scrollDown", () => scrollActiveScreen(56));
   window.addEventListener("scrollUp", () => scrollActiveScreen(-56));
   window.addEventListener("sideClick", () => {
+    if (state.learnActive) {
+      speakCurrentLearnStep();
+      return;
+    }
     if (qs<HTMLElement>("#coach-overlay").classList.contains("active")) {
       speakActiveHelp();
       return;

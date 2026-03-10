@@ -284,6 +284,13 @@ h2 {
   transition: width 220ms ease;
 }
 
+.learn-objective {
+  margin-top: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .learn-visual {
   margin-top: 4px;
   min-height: 56px;
@@ -302,8 +309,65 @@ h2 {
 
 .learn-step-body {
   margin-top: 3px;
-  font-size: 9px;
+  font-size: 8px;
   line-height: 1.25;
+}
+
+.learn-step-prompt {
+  margin-top: 4px;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.learn-options {
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.learn-option {
+  min-height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--option-bg) 82%, #fff 18%);
+  color: var(--text);
+  font-size: 8px;
+  font-weight: 800;
+  text-align: left;
+  padding: 4px 6px;
+}
+
+.learn-option.learn-option-wide {
+  grid-column: 1 / -1;
+}
+
+.learn-option.correct {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 45%, transparent 55%);
+}
+
+.learn-option.wrong {
+  border-color: var(--bad);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bad) 45%, transparent 55%);
+}
+
+.learn-feedback {
+  margin-top: 4px;
+  font-size: 8px;
+  line-height: 1.25;
+  border-radius: 8px;
+  padding: 4px 5px;
+  background: color-mix(in srgb, var(--option-bg) 74%, #fff 26%);
+}
+
+.learn-feedback.good {
+  color: var(--ok);
+}
+
+.learn-feedback.retry {
+  color: color-mix(in srgb, var(--bad) 78%, #fff 22%);
 }
 
 .learn-actions {
