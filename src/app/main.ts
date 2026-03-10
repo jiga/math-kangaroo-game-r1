@@ -18,8 +18,17 @@ import {
 type GameMode = "contest" | "learn" | "practice";
 type HelpMode = "hint" | "steps" | "explain";
 type ScreenId = "home" | "game" | "result";
+type AnswerLayoutMode = "inline" | "grid" | "stack";
+type ScrollRailState = {
+  visible: boolean;
+  thumbTop: number;
+  thumbHeight: number;
+  pulse: boolean;
+};
 
 const tts = new TTSQueue();
+const ACTION_HINT_KEY = "mk_icon_hint_seen_v1";
+const SCROLL_STEP = 56;
 const defaultScrollSelectors: Record<ScreenId, string> = {
   home: "#home-screen .screen-scroll",
   game: "#game-screen .question-card",
@@ -33,6 +42,19 @@ let touchScrollState: {
   startScrollTop: number;
 } = {
   target: null,
+  startY: 0,
+  startScrollTop: 0
+};
+let actionHintTimerId: number | null = null;
+let scrollRailPulseArmed = false;
+let scrollRailDragState: {
+  active: boolean;
+  pointerId: number | null;
+  startY: number;
+  startScrollTop: number;
+} = {
+  active: false,
+  pointerId: null,
   startY: 0,
   startScrollTop: 0
 };
@@ -67,6 +89,9 @@ const state: {
   learnFeedback: string;
   learnFeedbackTone: "good" | "retry" | "";
   learnSelectedIndex: number | null;
+  answerLayoutMode: AnswerLayoutMode;
+  learnAnswerLayoutMode: AnswerLayoutMode;
+  scrollRailState: ScrollRailState;
 } = {
   theme: "neon",
   grade: 1,
@@ -96,13 +121,37 @@ const state: {
   learnStepAttempts: 0,
   learnFeedback: "",
   learnFeedbackTone: "",
-  learnSelectedIndex: null
+  learnSelectedIndex: null,
+  answerLayoutMode: "grid",
+  learnAnswerLayoutMode: "grid",
+  scrollRailState: {
+    visible: false,
+    thumbTop: 0,
+    thumbHeight: 18,
+    pulse: false
+  }
 };
 
 function qs<T extends Element>(selector: string): T {
   const node = document.querySelector(selector);
   if (!node) throw new Error(`Missing selector: ${selector}`);
   return node as T;
+}
+
+function readLocalFlag(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeLocalFlag(key: string): void {
+  try {
+    window.localStorage.setItem(key, "1");
+  } catch {
+    // ignore storage errors inside constrained webviews
+  }
 }
 
 function setPreferredScrollTarget(target: HTMLElement | null): void {
@@ -123,6 +172,153 @@ function syncViewportMetrics(): void {
   document.body.dataset.compactHeight = height < 270 ? "true" : "false";
 }
 
+function hideActionHint(): void {
+  if (actionHintTimerId !== null) {
+    window.clearTimeout(actionHintTimerId);
+    actionHintTimerId = null;
+  }
+  qs<HTMLElement>("#action-hint").hidden = true;
+}
+
+function maybeShowActionHint(): void {
+  if (readLocalFlag(ACTION_HINT_KEY)) return;
+  const hint = qs<HTMLElement>("#action-hint");
+  hint.hidden = false;
+  writeLocalFlag(ACTION_HINT_KEY);
+  actionHintTimerId = window.setTimeout(() => {
+    hideActionHint();
+  }, 2800);
+}
+
+function clearScrollRailPulse(): void {
+  scrollRailPulseArmed = false;
+  qs<HTMLElement>("#scroll-rail").classList.remove("pulse");
+}
+
+function armScrollRailPulse(): void {
+  scrollRailPulseArmed = true;
+}
+
+function measureButtonLines(button: HTMLElement): number {
+  const lineHeight = Number.parseFloat(window.getComputedStyle(button).lineHeight);
+  if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+    return button.scrollHeight > button.clientHeight + 1 ? 2 : 1;
+  }
+  return Math.max(1, Math.round(button.scrollHeight / lineHeight));
+}
+
+function setOptionLayout(container: HTMLElement, layout: AnswerLayoutMode, learn = false): void {
+  container.dataset.layout = layout;
+  if (learn) {
+    state.learnAnswerLayoutMode = layout;
+    return;
+  }
+  state.answerLayoutMode = layout;
+}
+
+function evaluateLayout(container: HTMLElement, buttons: HTMLElement[], layout: AnswerLayoutMode, learn = false): {
+  wrappedCount: number;
+  overflowCount: number;
+} {
+  setOptionLayout(container, layout, learn);
+  void container.offsetWidth;
+  let wrappedCount = 0;
+  let overflowCount = 0;
+  for (const button of buttons) {
+    if (measureButtonLines(button) > 1) wrappedCount += 1;
+    if (button.scrollWidth > button.clientWidth + 1 || button.scrollHeight > button.clientHeight + 2) {
+      overflowCount += 1;
+    }
+  }
+  return { wrappedCount, overflowCount };
+}
+
+function chooseOptionLayout(
+  container: HTMLElement,
+  buttons: HTMLElement[],
+  hasVisual: boolean,
+  learn = false
+): AnswerLayoutMode {
+  if (!buttons.length) {
+    setOptionLayout(container, "grid", learn);
+    return "grid";
+  }
+
+  const labels = buttons.map((button) => (button.textContent || "").trim());
+  const inlineEligible = labels.every((label) => /^\S+$/.test(label) && label.length <= (learn ? 6 : 5));
+  if (inlineEligible) {
+    const inline = evaluateLayout(container, buttons, "inline", learn);
+    if (inline.wrappedCount === 0 && inline.overflowCount === 0) {
+      return "inline";
+    }
+  }
+
+  const grid = evaluateLayout(container, buttons, "grid", learn);
+  const gridTooTight = hasVisual
+    ? grid.wrappedCount >= 1 || grid.overflowCount > 0
+    : grid.wrappedCount >= 2 || grid.overflowCount > 0;
+  if (!gridTooTight) {
+    return "grid";
+  }
+
+  evaluateLayout(container, buttons, "stack", learn);
+  return "stack";
+}
+
+function updateScrollRail(): void {
+  const rail = qs<HTMLElement>("#scroll-rail");
+  const track = qs<HTMLElement>("#scroll-rail-track");
+  const thumb = qs<HTMLElement>("#scroll-rail-thumb");
+  const questionCard = qs<HTMLElement>("#game-screen .question-card");
+  const overlayOpen = qs<HTMLElement>("#coach-overlay").classList.contains("active");
+  const isGameScreen = document.querySelector<HTMLElement>(".screen.active")?.id === "game-screen";
+
+  if (!isGameScreen || overlayOpen) {
+    rail.hidden = true;
+    questionCard.dataset.overflowing = "false";
+    state.scrollRailState = { visible: false, thumbTop: 0, thumbHeight: 18, pulse: false };
+    return;
+  }
+
+  const maxScroll = Math.max(0, questionCard.scrollHeight - questionCard.clientHeight);
+  const visible = maxScroll > 2;
+  rail.hidden = !visible;
+  questionCard.dataset.overflowing = visible ? "true" : "false";
+
+  if (!visible) {
+    state.scrollRailState = { visible: false, thumbTop: 0, thumbHeight: 18, pulse: false };
+    rail.classList.remove("pulse");
+    return;
+  }
+
+  const trackHeight = Math.max(1, track.clientHeight);
+  const thumbHeight = Math.max(18, Math.round((questionCard.clientHeight / questionCard.scrollHeight) * trackHeight));
+  const travel = Math.max(0, trackHeight - thumbHeight);
+  const thumbTop = maxScroll <= 0 ? 0 : Math.round((questionCard.scrollTop / maxScroll) * travel);
+  thumb.style.height = `${thumbHeight}px`;
+  thumb.style.top = `${thumbTop}px`;
+
+  const pulse = scrollRailPulseArmed && questionCard.scrollTop < 2;
+  rail.classList.toggle("pulse", pulse);
+  state.scrollRailState = {
+    visible: true,
+    thumbTop,
+    thumbHeight,
+    pulse
+  };
+}
+
+function scheduleRailRefresh(beforeUpdate?: () => void): void {
+  window.requestAnimationFrame(() => {
+    beforeUpdate?.();
+    window.requestAnimationFrame(() => {
+      updateScrollRail();
+      window.setTimeout(() => updateScrollRail(), 120);
+      window.setTimeout(() => updateScrollRail(), 260);
+    });
+  });
+}
+
 function setScreen(screenId: ScreenId): void {
   const map: Record<string, string> = {
     home: "home-screen",
@@ -140,6 +336,8 @@ function setScreen(screenId: ScreenId): void {
     }
   }
   setPreferredScrollTarget(defaultScrollTargetForScreen(screenId));
+  if (screenId !== "game") hideActionHint();
+  scheduleRailRefresh();
 }
 
 function theme(themeName: "neon" | "gameboy"): void {
@@ -210,6 +408,7 @@ function setQuestionSolveView(hidden: boolean): void {
   const visual = qs<HTMLElement>("#question-visual");
   visual.style.display = hidden ? "none" : visual.dataset.hasVisual === "true" ? "block" : "none";
   qs<HTMLElement>("#options").style.display = hidden ? "none" : "grid";
+  scheduleRailRefresh();
 }
 
 function hideLearnPanel(): void {
@@ -227,8 +426,11 @@ function hideLearnPanel(): void {
   qs<HTMLElement>("#learn-visual").innerHTML = "";
   qs<HTMLElement>("#learn-step-prompt").hidden = true;
   qs<HTMLElement>("#learn-options").hidden = true;
+  qs<HTMLElement>("#learn-options").removeAttribute("data-layout");
   qs<HTMLElement>("#learn-feedback").hidden = true;
+  state.learnAnswerLayoutMode = "grid";
   setQuestionSolveView(false);
+  scheduleRailRefresh();
 }
 
 function totalQuestionsInRun(): number {
@@ -384,6 +586,20 @@ function fitOptionText(node: HTMLButtonElement, text: string): void {
   node.style.fontSize = "14px";
 }
 
+function applyQuestionOptionLayout(): void {
+  const question = currentQuestion();
+  const container = qs<HTMLElement>("#options");
+  const buttons = [...container.querySelectorAll<HTMLElement>(".option")];
+  chooseOptionLayout(container, buttons, Boolean(question?.visualAssetSpec), false);
+}
+
+function applyLearnOptionLayout(): void {
+  const container = qs<HTMLElement>("#learn-options");
+  const buttons = [...container.querySelectorAll<HTMLElement>(".learn-option")];
+  const hasVisual = !qs<HTMLElement>("#learn-visual").hidden;
+  chooseOptionLayout(container, buttons, hasVisual, true);
+}
+
 function findScrollableFromNode(node: EventTarget | null): HTMLElement | null {
   if (!(node instanceof HTMLElement)) return null;
   return node.closest<HTMLElement>('[data-scrollable="true"]');
@@ -413,7 +629,9 @@ function scrollActiveScreen(deltaY: number): void {
   const nextTop = Math.max(0, Math.min(maxScroll, target.scrollTop + deltaY));
   if (nextTop === target.scrollTop) return;
   target.scrollTop = nextTop;
+  clearScrollRailPulse();
   setPreferredScrollTarget(target);
+  if (target.matches("#game-screen .question-card")) updateScrollRail();
 }
 
 function bindScrollableFallbacks(): void {
@@ -455,6 +673,10 @@ function bindScrollableFallbacks(): void {
       const delta = touch.clientY - touchScrollState.startY;
       if (Math.abs(delta) < 3) return;
       target.scrollTop = touchScrollState.startScrollTop - delta;
+      if (target.matches("#game-screen .question-card")) {
+        clearScrollRailPulse();
+        updateScrollRail();
+      }
       event.preventDefault();
     },
     { passive: false }
@@ -498,7 +720,6 @@ function applyLearnStep(): void {
     step.options.forEach((option, index) => {
       const button = document.createElement("button");
       button.className = "learn-option";
-      if (index === 2) button.classList.add("learn-option-wide");
       if (state.learnSelectedIndex === index && state.learnFeedbackTone === "retry") button.classList.add("wrong");
       if (state.learnStepResolved && index === step.correctIndex) button.classList.add("correct");
       button.textContent = option;
@@ -506,10 +727,13 @@ function applyLearnStep(): void {
       button.addEventListener("click", () => onLearnChoice(index));
       options.appendChild(button);
     });
+    scheduleRailRefresh(() => applyLearnOptionLayout());
   } else {
     prompt.hidden = true;
     options.hidden = true;
     options.innerHTML = "";
+    options.removeAttribute("data-layout");
+    state.learnAnswerLayoutMode = "grid";
   }
 
   const nextButton = qs<HTMLButtonElement>("#learn-next");
@@ -521,6 +745,8 @@ function applyLearnStep(): void {
     : "NEXT";
   nextButton.disabled = step.kind === "check" && !state.learnStepResolved;
   qs<HTMLButtonElement>("#learn-skip").textContent = state.learnFlow.mode === "remediation" ? "SKIP FIX" : "SKIP LAB";
+  armScrollRailPulse();
+  scheduleRailRefresh();
 }
 
 function currentLearnStep() {
@@ -575,6 +801,8 @@ function finishLearnFlow(): void {
   qs<HTMLElement>("#learn-panel").hidden = true;
   setOptionsEnabled(true);
   resumeQuestionClock();
+  armScrollRailPulse();
+  scheduleRailRefresh(() => applyQuestionOptionLayout());
   if (wasRemediation) {
     window.setTimeout(next, 180);
   }
@@ -613,6 +841,7 @@ function startLabFlow(question: QuestionInstance, mode: "learn" | "remediation")
   setQuestionSolveView(true);
   setOptionsEnabled(false);
   applyLearnStep();
+  scheduleRailRefresh();
 }
 
 function startLearnFlow(question: QuestionInstance): void {
@@ -670,7 +899,6 @@ function renderQuestion(): void {
   q.options.forEach((opt, idx) => {
     const button = document.createElement("button");
     button.className = "option";
-    if (idx === 4) button.classList.add("option-wide");
     button.textContent = opt;
     fitOptionText(button, opt);
     button.addEventListener("click", () => onAnswer(idx, button));
@@ -680,7 +908,9 @@ function renderQuestion(): void {
   if (state.mode === "learn") {
     startLearnFlow(q);
   } else {
+    armScrollRailPulse();
     qs<HTMLElement>("#learn-panel").hidden = true;
+    scheduleRailRefresh(() => applyQuestionOptionLayout());
   }
 }
 
@@ -730,6 +960,7 @@ function showCoach(question: QuestionInstance, mode: HelpMode): void {
   overlay.setAttribute("aria-hidden", "false");
   renderHelpOverlay(question);
   setPreferredScrollTarget(qs<HTMLElement>("#coach-body"));
+  scheduleRailRefresh();
 }
 
 function hideCoach(): void {
@@ -742,6 +973,7 @@ function hideCoach(): void {
   if (screen?.id === "game-screen") {
     setPreferredScrollTarget(defaultScrollTargetForScreen("game"));
   }
+  scheduleRailRefresh();
 }
 
 function setHelpMode(mode: HelpMode): void {
@@ -869,15 +1101,21 @@ function startGame(): void {
   const timerWrap = qs<HTMLElement>("#hud-timer-wrap");
   const coachButton = qs<HTMLButtonElement>("#coach-btn");
   if (state.mode === "contest") {
+    timerWrap.hidden = false;
     timerWrap.style.display = "flex";
     coachButton.disabled = true;
+    coachButton.hidden = true;
+    hideActionHint();
     startTimer();
   } else {
+    timerWrap.hidden = true;
     timerWrap.style.display = "none";
     coachButton.disabled = false;
+    coachButton.hidden = false;
   }
 
   setScreen("game");
+  if (state.mode !== "contest") maybeShowActionHint();
   renderQuestion();
 }
 
@@ -921,6 +1159,7 @@ function exitHome(): void {
   clearLearnTimer();
   hideCoach();
   hideLearnPanel();
+  hideActionHint();
   setScreen("home");
 }
 
@@ -940,10 +1179,15 @@ function renderAppToText(): string {
     learnActive: state.learnActive,
     learnStep: currentLearnStep()?.title || "",
     learnPrompt: currentLearnStep()?.prompt || "",
+    answerLayoutMode: state.answerLayoutMode,
+    learnAnswerLayoutMode: state.learnAnswerLayoutMode,
     helpOpen: qs<HTMLElement>("#coach-overlay").classList.contains("active"),
     scrollTop: scrollTarget?.scrollTop ?? 0,
     scrollHeight: scrollTarget?.scrollHeight ?? 0,
-    clientHeight: scrollTarget?.clientHeight ?? 0
+    clientHeight: scrollTarget?.clientHeight ?? 0,
+    railVisible: state.scrollRailState.visible,
+    railThumbTop: state.scrollRailState.thumbTop,
+    railThumbHeight: state.scrollRailState.thumbHeight
   });
 }
 
@@ -954,10 +1198,15 @@ function wireUi(): void {
   updateModeInfo();
   theme("neon");
 
+  const questionCard = qs<HTMLElement>("#game-screen .question-card");
+  const railTrack = qs<HTMLElement>("#scroll-rail-track");
+  const railThumb = qs<HTMLElement>("#scroll-rail-thumb");
+
   qs<HTMLButtonElement>("#start-btn").addEventListener("click", startGame);
   qs<HTMLButtonElement>("#retry-btn").addEventListener("click", startGame);
   qs<HTMLButtonElement>("#quit-btn").addEventListener("click", exitHome);
   qs<HTMLButtonElement>("#home-btn").addEventListener("click", exitHome);
+  qs<HTMLElement>("#action-hint").addEventListener("click", hideActionHint);
 
   for (const button of document.querySelectorAll<HTMLButtonElement>(".btn-theme")) {
     button.addEventListener("click", () => theme((button.dataset.theme || "neon") as "neon" | "gameboy"));
@@ -992,9 +1241,9 @@ function wireUi(): void {
 
   window.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "PageDown") {
-      scrollActiveScreen(56);
+      scrollActiveScreen(SCROLL_STEP);
     } else if (event.key === "ArrowUp" || event.key === "PageUp") {
-      scrollActiveScreen(-56);
+      scrollActiveScreen(-SCROLL_STEP);
     }
   });
 
@@ -1002,14 +1251,14 @@ function wireUi(): void {
     "wheel",
     (event) => {
       if (Math.abs(event.deltaY) < 2) return;
-      scrollActiveScreen(event.deltaY > 0 ? 56 : -56);
+      scrollActiveScreen(event.deltaY > 0 ? SCROLL_STEP : -SCROLL_STEP);
     },
     { passive: true }
   );
 
   // Rabbit r1 hardware events used in official plugin-demo.
-  window.addEventListener("scrollDown", () => scrollActiveScreen(56));
-  window.addEventListener("scrollUp", () => scrollActiveScreen(-56));
+  window.addEventListener("scrollDown", () => scrollActiveScreen(SCROLL_STEP));
+  window.addEventListener("scrollUp", () => scrollActiveScreen(-SCROLL_STEP));
   window.addEventListener("sideClick", () => {
     if (state.learnActive) {
       speakCurrentLearnStep();
@@ -1025,8 +1274,87 @@ function wireUi(): void {
     void showCoach(q, "hint");
   });
 
-  window.addEventListener("resize", syncViewportMetrics);
-  window.visualViewport?.addEventListener("resize", syncViewportMetrics);
+  questionCard.addEventListener("scroll", () => {
+    if (questionCard.scrollTop > 1) clearScrollRailPulse();
+    updateScrollRail();
+  });
+
+  qs<HTMLButtonElement>("#scroll-rail-up").addEventListener("click", () => {
+    clearScrollRailPulse();
+    scrollActiveScreen(-SCROLL_STEP);
+  });
+
+  qs<HTMLButtonElement>("#scroll-rail-down").addEventListener("click", () => {
+    clearScrollRailPulse();
+    scrollActiveScreen(SCROLL_STEP);
+  });
+
+  railTrack.addEventListener("click", (event) => {
+    if (event.target === railThumb) return;
+    const bounds = railTrack.getBoundingClientRect();
+    const localY = event.clientY - bounds.top;
+    const thumbMid = state.scrollRailState.thumbTop + state.scrollRailState.thumbHeight / 2;
+    clearScrollRailPulse();
+    scrollActiveScreen(localY < thumbMid ? -SCROLL_STEP : SCROLL_STEP);
+  });
+
+  railThumb.addEventListener("pointerdown", (event) => {
+    const card = defaultScrollTargetForScreen("game");
+    if (!card || state.scrollRailState.visible === false) return;
+    clearScrollRailPulse();
+    scrollRailDragState = {
+      active: true,
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startScrollTop: card.scrollTop
+    };
+    railThumb.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  window.addEventListener(
+    "pointermove",
+    (event) => {
+      if (!scrollRailDragState.active || scrollRailDragState.pointerId !== event.pointerId) return;
+      const card = defaultScrollTargetForScreen("game");
+      if (!card) return;
+      const maxScroll = Math.max(0, card.scrollHeight - card.clientHeight);
+      if (maxScroll <= 0) return;
+      const travel = Math.max(1, railTrack.clientHeight - state.scrollRailState.thumbHeight);
+      const deltaRatio = (event.clientY - scrollRailDragState.startY) / travel;
+      card.scrollTop = Math.max(0, Math.min(maxScroll, scrollRailDragState.startScrollTop + deltaRatio * maxScroll));
+      setPreferredScrollTarget(card);
+      updateScrollRail();
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+
+  window.addEventListener("pointerup", (event) => {
+    if (scrollRailDragState.pointerId !== null && scrollRailDragState.pointerId !== event.pointerId) return;
+    if (scrollRailDragState.pointerId !== null && railThumb.hasPointerCapture(scrollRailDragState.pointerId)) {
+      railThumb.releasePointerCapture(scrollRailDragState.pointerId);
+    }
+    scrollRailDragState.active = false;
+    scrollRailDragState.pointerId = null;
+  });
+
+  window.addEventListener("pointercancel", (event) => {
+    if (scrollRailDragState.pointerId !== null && scrollRailDragState.pointerId !== event.pointerId) return;
+    if (scrollRailDragState.pointerId !== null && railThumb.hasPointerCapture(scrollRailDragState.pointerId)) {
+      railThumb.releasePointerCapture(scrollRailDragState.pointerId);
+    }
+    scrollRailDragState.active = false;
+    scrollRailDragState.pointerId = null;
+  });
+
+  const onViewportResize = (): void => {
+    syncViewportMetrics();
+    scheduleRailRefresh();
+  };
+
+  window.addEventListener("resize", onViewportResize);
+  window.visualViewport?.addEventListener("resize", onViewportResize);
   window.render_game_to_text = renderAppToText;
   window.advanceTime = (ms: number): Promise<void> =>
     new Promise((resolve) => {

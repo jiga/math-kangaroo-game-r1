@@ -40,19 +40,40 @@ __APP_CSS__
     </main>
 
     <main id="game-screen" class="screen">
-      <section class="card hud">
-        <div class="hud-item"><span class="hud-label">G</span><span id="hud-grade">1</span></div>
-        <div class="hud-item"><span class="hud-label">Q</span><span id="hud-q">1/24</span></div>
-        <div class="hud-item"><span class="hud-label">PTS</span><span id="hud-points">0</span></div>
-        <div class="hud-item" id="hud-timer-wrap"><span class="hud-label">T</span><span id="hud-time">75:00</span></div>
+      <section class="card hud-bar">
+        <div class="hud-stats">
+          <div class="hud-item"><span class="hud-label">G</span><span id="hud-grade">1</span></div>
+          <div class="hud-item"><span class="hud-label">Q</span><span id="hud-q">1/24</span></div>
+          <div class="hud-item"><span class="hud-label">PTS</span><span id="hud-points">0</span></div>
+          <div class="hud-item" id="hud-timer-wrap"><span class="hud-label">T</span><span id="hud-time">75:00</span></div>
+        </div>
+        <div class="hud-actions" aria-label="Game controls">
+          <button id="home-btn" class="icon-btn btn-ghost" aria-label="Go home" title="Home">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4.5 10.5 12 4.8l7.5 5.7" />
+              <path d="M7.2 10.3v8h9.6v-8" />
+            </svg>
+          </button>
+          <button id="coach-btn" class="icon-btn btn-ghost" aria-label="Open help" title="Help">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.3" />
+              <path d="M9.5 9.3a2.7 2.7 0 1 1 4 2.3c-.8.5-1.3 1-1.3 1.9" />
+              <circle cx="12" cy="16.8" r=".9" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+        </div>
       </section>
+      <div id="action-hint" class="action-hint" hidden>⌂ home · ? help</div>
 
       <section class="card question-card" data-scrollable="true" tabindex="0">
         <div id="question-meta" class="question-meta"></div>
         <div id="learn-panel" class="learn-panel" hidden>
           <div class="learn-top">
-            <div id="learn-step-title" class="learn-step-title"></div>
-            <div id="learn-step-index" class="learn-step-index"></div>
+            <div class="learn-headings">
+              <div id="learn-step-title" class="learn-step-title"></div>
+              <div id="learn-step-index" class="learn-step-index"></div>
+            </div>
+            <button id="learn-skip" class="learn-skip-btn btn-ghost" aria-label="Skip lesson">SKIP</button>
           </div>
           <div class="learn-progress"><span id="learn-progress-fill"></span></div>
           <div id="learn-objective" class="learn-objective"></div>
@@ -62,18 +83,19 @@ __APP_CSS__
           <div id="learn-options" class="learn-options" hidden></div>
           <div id="learn-feedback" class="learn-feedback" hidden></div>
           <div class="learn-actions">
-            <button id="learn-skip" class="btn btn-ghost">SKIP LAB</button>
             <button id="learn-next" class="btn btn-mode">NEXT</button>
           </div>
         </div>
         <div id="question-text" class="question-text"></div>
         <div id="question-visual" class="question-visual" aria-live="polite"></div>
         <div id="options" class="options"></div>
-      </section>
-
-      <section class="footer-actions">
-        <button id="home-btn" class="btn btn-ghost">HOME</button>
-        <button id="coach-btn" class="btn btn-ghost">HELP</button>
+        <div id="scroll-rail" class="scroll-rail" hidden aria-hidden="true">
+          <button id="scroll-rail-up" class="scroll-rail-step" aria-label="Scroll up">▲</button>
+          <div id="scroll-rail-track" class="scroll-rail-track" aria-hidden="true">
+            <div id="scroll-rail-thumb" class="scroll-rail-thumb"></div>
+          </div>
+          <button id="scroll-rail-down" class="scroll-rail-step" aria-label="Scroll down">▼</button>
+        </div>
       </section>
     </main>
 
