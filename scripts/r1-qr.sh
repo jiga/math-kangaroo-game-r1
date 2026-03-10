@@ -23,14 +23,22 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -d "${QR_VENV}" ]; then
+if [ -d "${QR_VENV}" ] && [ ! -f "${QR_VENV}/pyvenv.cfg" ]; then
+  rm -rf "${QR_VENV}"
+fi
+
+if [ ! -d "${QR_VENV}" ] || [ ! -x "${QR_VENV}/bin/python" ] || [ ! -f "${QR_VENV}/pyvenv.cfg" ]; then
   python3 -m venv "${QR_VENV}"
+fi
+
+if [ ! -x "${QR_VENV}/bin/pip" ]; then
+  "${QR_VENV}/bin/python" -m ensurepip --upgrade >/dev/null 2>&1 || true
 fi
 
 if ! "${QR_VENV}/bin/python" - <<'PY' >/dev/null 2>&1; then
 import qrcode
 PY
-  "${QR_VENV}/bin/pip" install -q "qrcode[pil]"
+  "${QR_VENV}/bin/python" -m pip install -q "qrcode[pil]"
 fi
 
 "${QR_VENV}/bin/python" - <<PY
