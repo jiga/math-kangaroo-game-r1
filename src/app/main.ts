@@ -6,6 +6,13 @@ import { getDeterministicCoach } from "../coach/deterministicCoach";
 import { TTSQueue } from "../audio/ttsQueue";
 import { loadProfile, loadProfileAsync, saveProfileAsync } from "../storage/profileStore";
 import { buildConceptLab, type ConceptLabFlow } from "../learn/conceptLab";
+import {
+  getGuidedTopic,
+  listGuidedTopics,
+  type GuidedStage,
+  type GuidedTopic,
+  type GuidedTopicId
+} from "../learn/guidedLessons";
 import { renderLessonScene } from "../render/visualQuestionRenderer";
 import {
   finalizePracticeSession,
@@ -89,6 +96,14 @@ const state: {
   learnFeedback: string;
   learnFeedbackTone: "good" | "retry" | "";
   learnSelectedIndex: number | null;
+  guidedTopicId: GuidedTopicId | null;
+  guidedStepIndex: number;
+  guidedValues: Record<string, number | string>;
+  guidedStepResolved: boolean;
+  guidedStepAttempts: number;
+  guidedFeedback: string;
+  guidedFeedbackTone: "good" | "retry" | "";
+  guidedSelectedIndex: number | null;
   answerLayoutMode: AnswerLayoutMode;
   learnAnswerLayoutMode: AnswerLayoutMode;
   scrollRailState: ScrollRailState;
@@ -122,6 +137,14 @@ const state: {
   learnFeedback: "",
   learnFeedbackTone: "",
   learnSelectedIndex: null,
+  guidedTopicId: null,
+  guidedStepIndex: 0,
+  guidedValues: {},
+  guidedStepResolved: true,
+  guidedStepAttempts: 0,
+  guidedFeedback: "",
+  guidedFeedbackTone: "",
+  guidedSelectedIndex: null,
   answerLayoutMode: "grid",
   learnAnswerLayoutMode: "grid",
   scrollRailState: {
@@ -381,7 +404,7 @@ function updateModeInfo(): void {
   if (state.mode === "contest") {
     info = `Contest · ${state.grade <= 4 ? 24 : 30} Q · 75 min · 3/4/5 points`;
   } else if (state.mode === "learn") {
-    info = `Learn · ${total} Q · Concept lab + checks + transfer`;
+    info = state.grade <= 2 ? "Learn · Topic lessons · Interactive visuals + checks" : `Learn · ${total} Q · Concept lab + checks + transfer`;
   } else {
     info = `Practice · ${total} Q · Adaptive + fix-the-miss drills`;
   }
@@ -431,6 +454,348 @@ function hideLearnPanel(): void {
   state.learnAnswerLayoutMode = "grid";
   setQuestionSolveView(false);
   scheduleRailRefresh();
+}
+
+function isGuidedLearnMode(): boolean {
+  return state.mode === "learn" && state.grade <= 2;
+}
+
+function currentGuidedTopic(): GuidedTopic | null {
+  if (!isGuidedLearnMode() || !state.guidedTopicId) return null;
+  return getGuidedTopic(state.grade, state.guidedTopicId);
+}
+
+function currentGuidedStage(): GuidedStage | null {
+  const topic = currentGuidedTopic();
+  if (!topic) return null;
+  return topic.stages[state.guidedStepIndex] || null;
+}
+
+function resetGuidedState(): void {
+  state.guidedTopicId = null;
+  state.guidedStepIndex = 0;
+  state.guidedValues = {};
+  state.guidedStepResolved = true;
+  state.guidedStepAttempts = 0;
+  state.guidedFeedback = "";
+  state.guidedFeedbackTone = "";
+  state.guidedSelectedIndex = null;
+}
+
+function hideGuidedLessons(): void {
+  resetGuidedState();
+  qs<HTMLElement>("#topic-browser").hidden = true;
+  qs<HTMLElement>("#guided-panel").hidden = true;
+  qs<HTMLElement>("#guided-visual").innerHTML = "";
+  const options = qs<HTMLElement>("#guided-choice-options");
+  options.innerHTML = "";
+  options.hidden = true;
+  options.removeAttribute("data-layout");
+  qs<HTMLElement>("#guided-choice-prompt").hidden = true;
+  qs<HTMLElement>("#guided-choice-feedback").hidden = true;
+  qs<HTMLElement>("#question-meta").style.display = "";
+}
+
+function setHudText(
+  labels: { grade?: string; q?: string; points?: string; time?: string },
+  values: { grade?: string; q?: string; points?: string; time?: string }
+): void {
+  if (labels.grade) qs<HTMLElement>("#hud-grade-label").textContent = labels.grade;
+  if (labels.q) qs<HTMLElement>("#hud-q-label").textContent = labels.q;
+  if (labels.points) qs<HTMLElement>("#hud-points-label").textContent = labels.points;
+  if (labels.time) qs<HTMLElement>("#hud-time-label").textContent = labels.time;
+  if (values.grade !== undefined) qs<HTMLElement>("#hud-grade").textContent = values.grade;
+  if (values.q !== undefined) qs<HTMLElement>("#hud-q").textContent = values.q;
+  if (values.points !== undefined) qs<HTMLElement>("#hud-points").textContent = values.points;
+  if (values.time !== undefined) qs<HTMLElement>("#hud-time").textContent = values.time;
+}
+
+function updateHudForGuidedLearn(browser = false): void {
+  const topic = currentGuidedTopic();
+  const topics = listGuidedTopics(state.grade);
+  const timerWrap = qs<HTMLElement>("#hud-timer-wrap");
+  const coachButton = qs<HTMLButtonElement>("#coach-btn");
+  timerWrap.hidden = true;
+  timerWrap.style.display = "none";
+  coachButton.hidden = true;
+  coachButton.disabled = true;
+
+  if (browser || !topic) {
+    setHudText(
+      { grade: "G", q: "MODE", points: "TOPIC" },
+      { grade: String(state.grade), q: "LEARN", points: `${topics.length}` }
+    );
+    return;
+  }
+
+  setHudText(
+    { grade: "G", q: "MODE", points: "STEP" },
+    {
+      grade: String(state.grade),
+      q: "LEARN",
+      points: `${state.guidedStepIndex + 1}/${topic.stages.length}`
+    }
+  );
+}
+
+function setGuidedValue(key: string, value: number | string): void {
+  state.guidedValues = { ...state.guidedValues, [key]: value };
+
+  if ("parts" in state.guidedValues && "shaded" in state.guidedValues) {
+    const maxShaded = Math.max(1, Math.min(Number(state.guidedValues.parts), 2));
+    state.guidedValues.shaded = Math.max(1, Math.min(Number(state.guidedValues.shaded), maxShaded));
+  }
+
+  renderGuidedStage();
+}
+
+function applyGuidedChoiceLayout(): void {
+  const container = qs<HTMLElement>("#guided-choice-options");
+  const buttons = [...container.querySelectorAll<HTMLElement>(".guided-choice-option")];
+  chooseOptionLayout(container, buttons, !qs<HTMLElement>("#guided-visual").hidden, true);
+}
+
+function renderGuidedTopicBrowser(): void {
+  hideCoach();
+  hideLearnPanel();
+  resetGuidedState();
+  setQuestionSolveView(true);
+  const card = qs<HTMLElement>(".question-card");
+  card.scrollTop = 0;
+  setPreferredScrollTarget(card);
+  qs<HTMLElement>("#question-meta").style.display = "none";
+  qs<HTMLElement>("#guided-panel").hidden = true;
+  const browser = qs<HTMLElement>("#topic-browser");
+  browser.hidden = false;
+  updateHudForGuidedLearn(true);
+
+  const topics = listGuidedTopics(state.grade);
+  browser.innerHTML = `
+    <div class="topic-browser-intro">
+      Pick one concept. Move the sliders, watch the picture change, answer a quick check, then move to the next step.
+    </div>
+  `;
+
+  topics.forEach((topic) => {
+    const button = document.createElement("button");
+    button.className = "topic-card";
+    button.type = "button";
+    button.innerHTML = `
+      <div class="topic-card-title">${topic.title}</div>
+      <div class="topic-card-summary">${topic.summary}</div>
+      <div class="topic-card-skills">${topic.skills.map((skill) => skill.replaceAll("_", " ")).join(" · ")}</div>
+    `;
+    button.addEventListener("click", () => startGuidedTopic(topic.id));
+    browser.appendChild(button);
+  });
+
+  armScrollRailPulse();
+  scheduleRailRefresh();
+}
+
+function renderGuidedStage(): void {
+  const topic = currentGuidedTopic();
+  const stage = currentGuidedStage();
+  if (!topic || !stage) {
+    renderGuidedTopicBrowser();
+    return;
+  }
+
+  hideCoach();
+  hideLearnPanel();
+  setQuestionSolveView(true);
+
+  const browser = qs<HTMLElement>("#topic-browser");
+  const panel = qs<HTMLElement>("#guided-panel");
+  const card = qs<HTMLElement>(".question-card");
+  browser.hidden = true;
+  panel.hidden = false;
+  card.scrollTop = 0;
+  setPreferredScrollTarget(card);
+
+  updateHudForGuidedLearn(false);
+  qs<HTMLElement>("#question-meta").style.display = "none";
+  qs<HTMLElement>("#guided-topic-title").textContent = topic.title;
+  qs<HTMLElement>("#guided-step-index").textContent = `${state.guidedStepIndex + 1}/${topic.stages.length}`;
+  qs<HTMLElement>("#guided-step-title").textContent = stage.title;
+  qs<HTMLElement>("#guided-step-body").textContent = stage.body(state.guidedValues);
+  qs<HTMLElement>("#guided-derivation").textContent = stage.derivation(state.guidedValues);
+
+  const visual = stage.visual(state.guidedValues);
+  const guidedVisual = qs<HTMLElement>("#guided-visual");
+  guidedVisual.innerHTML = visual.svg;
+  guidedVisual.setAttribute("aria-label", visual.altText);
+  guidedVisual.hidden = false;
+
+  const controls = qs<HTMLElement>("#guided-controls");
+  controls.innerHTML = "";
+  (stage.controls || []).forEach((control) => {
+    const wrap = document.createElement("div");
+    wrap.className = "guided-control";
+
+    if (control.kind === "range") {
+      const current = Number(state.guidedValues[control.key] ?? control.min);
+      wrap.innerHTML = `
+        <div class="guided-control-top">
+          <span class="guided-control-label">${control.label}</span>
+          <span class="guided-control-value">${control.formatter ? control.formatter(current) : current}</span>
+        </div>
+      `;
+      const input = document.createElement("input");
+      input.className = "guided-control-range";
+      input.type = "range";
+      input.min = String(control.min);
+      input.max = String(control.max);
+      input.step = String(control.step || 1);
+      input.value = String(current);
+      input.addEventListener("input", () => setGuidedValue(control.key, Number(input.value)));
+      wrap.appendChild(input);
+    } else {
+      wrap.innerHTML = `
+        <div class="guided-control-top">
+          <span class="guided-control-label">${control.label}</span>
+        </div>
+      `;
+      const row = document.createElement("div");
+      row.className = "guided-toggle-row";
+      control.options.forEach((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "guided-toggle-btn";
+        button.textContent = option.label;
+        button.classList.toggle("active", state.guidedValues[control.key] === option.value);
+        button.addEventListener("click", () => setGuidedValue(control.key, option.value));
+        row.appendChild(button);
+      });
+      wrap.appendChild(row);
+    }
+
+    controls.appendChild(wrap);
+  });
+
+  const prompt = qs<HTMLElement>("#guided-choice-prompt");
+  const options = qs<HTMLElement>("#guided-choice-options");
+  const feedback = qs<HTMLElement>("#guided-choice-feedback");
+  const hasCheck = Boolean(stage.prompt && stage.options && stage.correctIndex);
+
+  if (hasCheck) {
+    prompt.hidden = false;
+    prompt.textContent = stage.prompt!(state.guidedValues);
+    options.hidden = false;
+    options.innerHTML = "";
+    const optionValues = stage.options!(state.guidedValues);
+    const correctIndex = stage.correctIndex!(state.guidedValues);
+    optionValues.forEach((option, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "guided-choice-option";
+      button.textContent = option;
+      if (state.guidedSelectedIndex === index) {
+        if (state.guidedStepResolved && index !== correctIndex) {
+          button.classList.add("wrong");
+        } else if (!state.guidedStepResolved && state.guidedFeedbackTone === "retry") {
+          button.classList.add("wrong");
+        }
+      }
+      if (state.guidedStepResolved && index === correctIndex) button.classList.add("correct");
+      button.disabled = state.guidedStepResolved;
+      button.addEventListener("click", () => onGuidedChoice(index));
+      options.appendChild(button);
+    });
+
+    feedback.hidden = !state.guidedFeedback;
+    feedback.textContent = state.guidedFeedback;
+    feedback.className = `guided-choice-feedback${state.guidedFeedbackTone ? ` ${state.guidedFeedbackTone}` : ""}`;
+    scheduleRailRefresh(() => applyGuidedChoiceLayout());
+  } else {
+    prompt.hidden = true;
+    options.hidden = true;
+    options.innerHTML = "";
+    options.removeAttribute("data-layout");
+    feedback.hidden = true;
+    feedback.textContent = "";
+  }
+
+  const nextButton = qs<HTMLButtonElement>("#guided-next");
+  const isLast = state.guidedStepIndex >= topic.stages.length - 1;
+  nextButton.textContent = isLast ? "DONE" : "NEXT";
+  nextButton.disabled = hasCheck && !state.guidedStepResolved;
+
+  armScrollRailPulse();
+  scheduleRailRefresh();
+}
+
+function startGuidedTopic(topicId: GuidedTopicId): void {
+  const topic = getGuidedTopic(state.grade, topicId);
+  if (!topic) return;
+  state.guidedTopicId = topicId;
+  state.guidedStepIndex = 0;
+  state.guidedValues = { ...topic.initialValues };
+  state.guidedStepResolved = !(topic.stages[0]?.prompt && topic.stages[0]?.options && topic.stages[0]?.correctIndex);
+  state.guidedStepAttempts = 0;
+  state.guidedFeedback = "";
+  state.guidedFeedbackTone = "";
+  state.guidedSelectedIndex = null;
+  renderGuidedStage();
+}
+
+function onGuidedChoice(index: number): void {
+  const stage = currentGuidedStage();
+  if (!stage?.prompt || !stage.options || !stage.correctIndex) return;
+
+  const correctIndex = stage.correctIndex(state.guidedValues);
+  state.guidedStepAttempts += 1;
+  state.guidedSelectedIndex = index;
+
+  if (index === correctIndex) {
+    state.guidedStepResolved = true;
+    state.guidedFeedback = stage.success?.(state.guidedValues) || "Correct.";
+    state.guidedFeedbackTone = "good";
+  } else if (state.guidedStepAttempts >= 2) {
+    state.guidedStepResolved = true;
+    state.guidedFeedback = stage.retry?.(state.guidedValues) || "Use the picture and try again on the next step.";
+    state.guidedFeedbackTone = "retry";
+  } else {
+    state.guidedStepResolved = false;
+    state.guidedFeedback = `${stage.retry?.(state.guidedValues) || "Try one more time."} Try once more.`;
+    state.guidedFeedbackTone = "retry";
+  }
+
+  renderGuidedStage();
+}
+
+function advanceGuidedStage(): void {
+  const topic = currentGuidedTopic();
+  const stage = currentGuidedStage();
+  if (!topic || !stage) return;
+  if (stage.prompt && stage.options && stage.correctIndex && !state.guidedStepResolved) return;
+
+  if (state.guidedStepIndex >= topic.stages.length - 1) {
+    renderGuidedTopicBrowser();
+    return;
+  }
+
+  state.guidedStepIndex += 1;
+  const nextStage = currentGuidedStage();
+  state.guidedStepResolved = !(nextStage?.prompt && nextStage?.options && nextStage?.correctIndex);
+  state.guidedStepAttempts = 0;
+  state.guidedFeedback = "";
+  state.guidedFeedbackTone = "";
+  state.guidedSelectedIndex = null;
+  renderGuidedStage();
+}
+
+function speakCurrentGuidedStage(): void {
+  const stage = currentGuidedStage();
+  const topic = currentGuidedTopic();
+  if (!stage || !topic) return;
+  const pieces = [
+    topic.title,
+    stage.title,
+    stage.speak ? stage.speak(state.guidedValues) : stage.body(state.guidedValues)
+  ];
+  if (stage.prompt) pieces.push(stage.prompt(state.guidedValues));
+  speakCoach(pieces.join(". "));
 }
 
 function totalQuestionsInRun(): number {
@@ -855,6 +1220,7 @@ function startRemediationFlow(question: QuestionInstance): void {
 function renderQuestion(): void {
   tts.cancelAll();
   hideLearnPanel();
+  hideGuidedLessons();
   const q = currentQuestion();
   if (!q) {
     endGame();
@@ -1053,6 +1419,13 @@ function prepareQuestions(): void {
       return;
     }
 
+    if (state.mode === "learn") {
+      state.questions = [];
+      state.stageLabel = "Learn";
+      state.practiceSession = null;
+      return;
+    }
+
     const provider = createPracticeProvider(state.grade as 1 | 2);
     setPracticeQuestionProvider({
       pickAny: (grade, avoidHashes, pointTier) => provider.pickAny(avoidHashes, pointTier),
@@ -1082,6 +1455,7 @@ function startGame(): void {
   clearLearnTimer();
   hideCoach();
   hideLearnPanel();
+  hideGuidedLessons();
 
   state.index = 0;
   state.score = 0;
@@ -1094,12 +1468,28 @@ function startGame(): void {
 
   prepareQuestions();
 
+  const timerWrap = qs<HTMLElement>("#hud-timer-wrap");
+  const coachButton = qs<HTMLButtonElement>("#coach-btn");
+  if (isGuidedLearnMode()) {
+    clearTimer();
+    timerWrap.hidden = true;
+    timerWrap.style.display = "none";
+    coachButton.disabled = true;
+    coachButton.hidden = true;
+    hideActionHint();
+    setScreen("game");
+    renderGuidedTopicBrowser();
+    return;
+  }
+
+  setHudText(
+    { grade: "G", q: "Q", points: "PTS", time: "T" },
+    { grade: String(state.grade), q: `1/${totalQuestionsInRun()}`, points: "0" }
+  );
   qs<HTMLElement>("#hud-grade").textContent = String(state.grade);
   qs<HTMLElement>("#hud-points").textContent = "0";
   qs<HTMLElement>("#hud-q").textContent = `1/${totalQuestionsInRun()}`;
 
-  const timerWrap = qs<HTMLElement>("#hud-timer-wrap");
-  const coachButton = qs<HTMLButtonElement>("#coach-btn");
   if (state.mode === "contest") {
     timerWrap.hidden = false;
     timerWrap.style.display = "flex";
@@ -1124,6 +1514,7 @@ function endGame(): void {
   clearLearnTimer();
   hideCoach();
   hideLearnPanel();
+  hideGuidedLessons();
 
   if ((state.mode === "practice" || state.mode === "learn") && state.practiceSession) {
     finalizePracticeSession(state.practiceSession, state.profile);
@@ -1159,6 +1550,7 @@ function exitHome(): void {
   clearLearnTimer();
   hideCoach();
   hideLearnPanel();
+  hideGuidedLessons();
   hideActionHint();
   setScreen("home");
 }
@@ -1177,6 +1569,8 @@ function renderAppToText(): string {
     question: question?.prompt || "",
     options: question?.options || [],
     learnActive: state.learnActive,
+    guidedTopic: currentGuidedTopic()?.title || "",
+    guidedStep: currentGuidedStage()?.title || "",
     learnStep: currentLearnStep()?.title || "",
     learnPrompt: currentLearnStep()?.prompt || "",
     answerLayoutMode: state.answerLayoutMode,
@@ -1239,6 +1633,14 @@ function wireUi(): void {
     finishLearnFlow();
   });
 
+  qs<HTMLButtonElement>("#guided-next").addEventListener("click", () => {
+    advanceGuidedStage();
+  });
+
+  qs<HTMLButtonElement>("#guided-back").addEventListener("click", () => {
+    renderGuidedTopicBrowser();
+  });
+
   window.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "PageDown") {
       scrollActiveScreen(SCROLL_STEP);
@@ -1260,6 +1662,14 @@ function wireUi(): void {
   window.addEventListener("scrollDown", () => scrollActiveScreen(SCROLL_STEP));
   window.addEventListener("scrollUp", () => scrollActiveScreen(-SCROLL_STEP));
   window.addEventListener("sideClick", () => {
+    if (isGuidedLearnMode() && document.querySelector<HTMLElement>("#game-screen.active")) {
+      if (currentGuidedTopic()) {
+        speakCurrentGuidedStage();
+      } else {
+        speakCoach("Pick a topic. Move a slider, watch the picture change, then solve the quick check.");
+      }
+      return;
+    }
     if (state.learnActive) {
       speakCurrentLearnStep();
       return;

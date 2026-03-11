@@ -42,10 +42,10 @@ __APP_CSS__
     <main id="game-screen" class="screen">
       <section class="card hud-bar">
         <div class="hud-stats">
-          <div class="hud-item"><span class="hud-label">G</span><span id="hud-grade">1</span></div>
-          <div class="hud-item"><span class="hud-label">Q</span><span id="hud-q">1/24</span></div>
-          <div class="hud-item"><span class="hud-label">PTS</span><span id="hud-points">0</span></div>
-          <div class="hud-item" id="hud-timer-wrap"><span class="hud-label">T</span><span id="hud-time">75:00</span></div>
+          <div class="hud-item"><span id="hud-grade-label" class="hud-label">G</span><span id="hud-grade">1</span></div>
+          <div class="hud-item"><span id="hud-q-label" class="hud-label">Q</span><span id="hud-q">1/24</span></div>
+          <div class="hud-item"><span id="hud-points-label" class="hud-label">PTS</span><span id="hud-points">0</span></div>
+          <div class="hud-item" id="hud-timer-wrap"><span id="hud-time-label" class="hud-label">T</span><span id="hud-time">75:00</span></div>
         </div>
         <div class="hud-actions" aria-label="Game controls">
           <button id="home-btn" class="icon-btn btn-ghost" aria-label="Go home" title="Home">
@@ -67,6 +67,27 @@ __APP_CSS__
 
       <section class="card question-card" data-scrollable="true" tabindex="0">
         <div id="question-meta" class="question-meta"></div>
+        <div id="topic-browser" class="topic-browser" hidden></div>
+        <div id="guided-panel" class="guided-panel" hidden>
+          <div class="guided-top">
+            <div class="guided-headings">
+              <div id="guided-topic-title" class="guided-topic-title"></div>
+              <div id="guided-step-index" class="guided-step-index"></div>
+            </div>
+            <button id="guided-back" class="guided-back btn-ghost" aria-label="Back to topics">TOPICS</button>
+          </div>
+          <div id="guided-step-title" class="guided-step-title"></div>
+          <div id="guided-derivation" class="guided-derivation"></div>
+          <div id="guided-visual" class="guided-visual" aria-live="polite"></div>
+          <div id="guided-step-body" class="guided-step-body"></div>
+          <div id="guided-controls" class="guided-controls"></div>
+          <div id="guided-choice-prompt" class="guided-choice-prompt" hidden></div>
+          <div id="guided-choice-options" class="guided-choice-options" hidden></div>
+          <div id="guided-choice-feedback" class="guided-choice-feedback" hidden></div>
+          <div class="guided-actions">
+            <button id="guided-next" class="btn btn-start">NEXT</button>
+          </div>
+        </div>
         <div id="learn-panel" class="learn-panel" hidden>
           <div class="learn-top">
             <div class="learn-headings">
