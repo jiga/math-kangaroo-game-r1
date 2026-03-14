@@ -97,7 +97,7 @@ function numberChoice(correct: number, offsets: [number, number, number]): { opt
 }
 
 const SVG_HEAD =
-  "xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 120' preserveAspectRatio='xMidYMid meet' shape-rendering='geometricPrecision' text-rendering='geometricPrecision'";
+  "xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120' preserveAspectRatio='xMidYMid meet' shape-rendering='geometricPrecision' text-rendering='geometricPrecision'";
 
 function svg(inner: string): string {
   return `<svg ${SVG_HEAD} role='img'>${inner}</svg>`;
