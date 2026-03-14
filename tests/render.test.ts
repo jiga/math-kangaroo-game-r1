@@ -10,6 +10,7 @@ import {
   renderSymmetry,
   renderVenn
 } from "../src/render/visualQuestionRenderer";
+import { formulaVisual, lessonCard } from "../src/content/bands/visuals";
 import { allSkillBlueprints } from "../src/learn/conceptLab";
 
 const checks = [
@@ -45,4 +46,17 @@ test("every Grade 1-2 skill gets a specific concept scene", () => {
     assert.notEqual(scene.altText, "General lesson card");
     assert.ok(!scene.svg.includes("Read. Picture. Solve."));
   }
+});
+
+test("long lesson text is fitted or wrapped inside svg visuals", () => {
+  const formula = formulaVisual(
+    ["order matters -> staged count across shrinking choices", "order does not matter -> divide duplicate arrangements"],
+    "counting choice"
+  );
+  const card = lessonCard(
+    "Combinatorics and Probability",
+    "Interactive lesson cards should keep long titles inside the visual frame instead of spilling out."
+  );
+  assert.ok(formula.svg.includes("<tspan"), "long formula lines should wrap");
+  assert.ok(card.svg.includes("<tspan"), "long lesson card text should wrap");
 });

@@ -6,6 +6,7 @@ import { GUIDED_TOPICS as G56_TOPICS } from "../content/bands/g56/guidedLessons"
 import { GUIDED_TOPICS as G78_TOPICS } from "../content/bands/g78/guidedLessons";
 import { GUIDED_TOPICS as G910_TOPICS } from "../content/bands/g910/guidedLessons";
 import { GUIDED_TOPICS as G1112_TOPICS } from "../content/bands/g1112/guidedLessons";
+import { estimateTextWidth, fitSingleLineText, svgSingleLineText } from "../render/svgText";
 
 export type { GuidedControl, GuidedStage, GuidedTopic, GuidedTopicId } from "./guidedTypes";
 
@@ -71,17 +72,23 @@ function scene(inner: string): string {
 }
 
 function badge(x: number, y: number, text: string): string {
-  const width = Math.max(26, text.length * 6 + 10);
+  const fitted = fitSingleLineText(text, 96, 9, 6.5);
+  const width = Math.max(26, Math.min(108, Math.ceil(estimateTextWidth(fitted.text, fitted.fontSize) + 12)));
   return `
     <g transform='translate(${x} ${y})'>
       <rect width='${width}' height='16' rx='8' fill='currentColor' fill-opacity='0.14' stroke='currentColor' stroke-width='1.5'/>
-      <text x='${width / 2}' y='11' text-anchor='middle' font-size='9' font-weight='700' fill='currentColor'>${text}</text>
+      ${svgSingleLineText(width / 2, 11, fitted.text, { size: fitted.fontSize, minSize: 6.5, maxWidth: width - 10 })}
     </g>
   `;
 }
 
-function label(x: number, y: number, text: string, size = 10, anchor = "middle"): string {
-  return `<text x='${x}' y='${y}' text-anchor='${anchor}' font-size='${size}' font-weight='700' fill='currentColor'>${text}</text>`;
+function label(x: number, y: number, text: string, size = 10, anchor: "start" | "middle" | "end" = "middle", maxWidth?: number): string {
+  return svgSingleLineText(x, y, text, {
+    size,
+    weight: 700,
+    anchor,
+    maxWidth: maxWidth ?? (anchor === "middle" ? 176 : 132)
+  });
 }
 
 function sequenceVisual(start: number, step: number, count: number, highlightIndex = -1): VisualAssetSpec {

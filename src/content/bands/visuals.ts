@@ -1,16 +1,8 @@
 import type { VisualAssetSpec } from "../../domain/types";
+import { escapeXml, estimateTextWidth, fitSingleLineText, fitTextBlock, svgSingleLineText, svgTextBlock } from "../../render/svgText";
 
 const SVG_HEAD =
   "xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120' preserveAspectRatio='xMidYMid meet' shape-rendering='geometricPrecision' text-rendering='geometricPrecision'";
-
-function escapeXml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
 
 function svg(inner: string): string {
   return `<svg ${SVG_HEAD} role='img'>${inner}</svg>`;
@@ -29,18 +21,23 @@ function frame(inner: string): string {
 }
 
 function badge(x: number, y: number, text: string): string {
-  const safe = escapeXml(text);
-  const width = Math.max(38, text.length * 6 + 12);
+  const fitted = fitSingleLineText(text, 96, 9, 6.5);
+  const width = Math.max(38, Math.min(108, Math.ceil(estimateTextWidth(fitted.text, fitted.fontSize) + 14)));
   return `
     <g transform='translate(${x} ${y})'>
       <rect width='${width}' height='16' rx='8' fill='currentColor' fill-opacity='0.14' stroke='currentColor' stroke-width='1.5'/>
-      <text x='${width / 2}' y='11' text-anchor='middle' font-size='9' font-weight='700' fill='currentColor'>${safe}</text>
+      ${svgSingleLineText(width / 2, 11, fitted.text, { size: fitted.fontSize, minSize: 6.5, maxWidth: width - 10 })}
     </g>
   `;
 }
 
-function label(x: number, y: number, text: string, size = 11, weight = 600, anchor = "middle"): string {
-  return `<text x='${x}' y='${y}' text-anchor='${anchor}' font-size='${size}' font-weight='${weight}' fill='currentColor'>${escapeXml(text)}</text>`;
+function label(x: number, y: number, text: string, size = 11, weight = 600, anchor: "start" | "middle" | "end" = "middle", maxWidth?: number): string {
+  return svgSingleLineText(x, y, text, {
+    size,
+    weight,
+    anchor,
+    maxWidth: maxWidth ?? (anchor === "middle" ? 176 : 132)
+  });
 }
 
 function gridLines(x: number, y: number, cols: number, rows: number, cell: number): string {
@@ -63,7 +60,7 @@ export function lessonCard(title: string, subtitle: string, accent = "move"): Vi
     kind: "lesson",
     svg: svg(
       frame(
-        `${badge(20, 16, accent)}${label(120, 58, title, 17, 800)}${label(120, 82, subtitle, 12, 500)}`
+        `${badge(20, 16, accent)}${svgTextBlock(120, 56, title, { size: 17, minSize: 10, maxWidth: 182, maxLines: 2, weight: 800 })}${svgTextBlock(120, 82, subtitle, { size: 12, minSize: 8, maxWidth: 188, maxLines: 2, weight: 500 })}`
       )
     ),
     altText: `${title}. ${subtitle}`
@@ -79,19 +76,34 @@ export function fractionBarVisual(parts: number, shaded: number, labelText: stri
     .join("");
   return {
     kind: "lesson",
-    svg: svg(frame(`${badge(20, 16, labelText)}${cells}${label(120, 94, `${safeShaded} of ${parts} equal parts`, 13, 500)}`)),
+    svg: svg(frame(`${badge(20, 16, labelText)}${cells}${svgTextBlock(120, 94, `${safeShaded} of ${parts} equal parts`, { size: 13, minSize: 8.5, maxWidth: 184, maxLines: 2, weight: 500 })}`)),
     altText: `${safeShaded} of ${parts} equal parts shaded`
   };
 }
 
 export function coordinateVisual(points: Array<{ x: number; y: number; label?: string }>, highlight?: number, segments: number[] = []): VisualAssetSpec {
-  const toX = (x: number) => 42 + x * 18;
-  const toY = (y: number) => 92 - y * 12;
+  const plotLeft = 44;
+  const plotBottom = 88;
+  const plotWidth = 156;
+  const plotHeight = 60;
+  const maxX = Math.max(4, ...points.map((pt) => pt.x));
+  const maxY = Math.max(4, ...points.map((pt) => pt.y));
+  const xStep = plotWidth / maxX;
+  const yStep = plotHeight / maxY;
+  const toX = (x: number) => plotLeft + x * xStep;
+  const toY = (y: number) => plotBottom - y * yStep;
   const pointSvg = points
-    .map((pt, index) => `
-      ${point(toX(pt.x), toY(pt.y), index === highlight ? 5 : 4, index === highlight ? 0.95 : 0.72)}
-      ${pt.label ? label(toX(pt.x) + 7, toY(pt.y) - 7, pt.label, 10, 600, "start") : ""}
-    `)
+    .map((pt, index) => {
+      const px = toX(pt.x);
+      const py = toY(pt.y);
+      const labelY = py < 30 ? py + 14 : py - 7;
+      const labelAnchor = px > 178 ? "end" : "start";
+      const labelX = labelAnchor === "end" ? px - 7 : px + 7;
+      return `
+        ${point(px, py, index === highlight ? 5 : 4, index === highlight ? 0.95 : 0.72)}
+        ${pt.label ? label(labelX, labelY, pt.label, 10, 600, labelAnchor, 28) : ""}
+      `;
+    })
     .join("");
   const pathSvg = segments.length
     ? segments
@@ -110,8 +122,8 @@ export function coordinateVisual(points: Array<{ x: number; y: number; label?: s
       frame(`
         <line x1='30' y1='92' x2='206' y2='92' stroke='currentColor' stroke-width='2'/>
         <line x1='42' y1='20' x2='42' y2='102' stroke='currentColor' stroke-width='2'/>
-        ${Array.from({ length: 9 }).map((_, i) => `<line x1='${42 + i * 18}' y1='88' x2='${42 + i * 18}' y2='96' stroke='currentColor' stroke-width='1.2'/>`).join("")}
-        ${Array.from({ length: 7 }).map((_, i) => `<line x1='38' y1='${92 - i * 12}' x2='46' y2='${92 - i * 12}' stroke='currentColor' stroke-width='1.2'/>`).join("")}
+        ${Array.from({ length: maxX + 1 }).map((_, i) => `<line x1='${toX(i)}' y1='88' x2='${toX(i)}' y2='96' stroke='currentColor' stroke-width='1.2'/>`).join("")}
+        ${Array.from({ length: maxY + 1 }).map((_, i) => `<line x1='38' y1='${toY(i)}' x2='46' y2='${toY(i)}' stroke='currentColor' stroke-width='1.2'/>`).join("")}
         ${pathSvg}
         ${pointSvg}
       `)
@@ -152,9 +164,26 @@ export function netVisual(faceCount: number, caption: string): VisualAssetSpec {
 }
 
 export function formulaVisual(lines: string[], badgeText = "rule"): VisualAssetSpec {
+  let currentTop = 38;
+  const top = lines
+    .slice(0, 3)
+    .map((line, index) => {
+      const preferredSize = index === 0 ? 14 : 12;
+      const fitted = fitTextBlock(line, 186, preferredSize, {
+        minSize: index === 0 ? 8.5 : 8,
+        maxLines: 2
+      });
+      const lineHeight = Math.round(fitted.fontSize * 1.2 * 10) / 10;
+      const block = `<text x='120' y='${currentTop}' dominant-baseline='hanging' text-anchor='middle' font-size='${fitted.fontSize}' font-weight='${index === 0 ? 700 : 500}' fill='currentColor'>${fitted.lines
+        .map((fitLine, lineIndex) => `<tspan x='120' y='${currentTop + lineIndex * lineHeight}'>${escapeXml(fitLine)}</tspan>`)
+        .join("")}</text>`;
+      currentTop += Math.max(fitted.fontSize, (fitted.lines.length - 1) * lineHeight + fitted.fontSize) + 4;
+      return block;
+    })
+    .join("");
   return {
     kind: "formula",
-    svg: svg(frame(`${badge(20, 16, badgeText)}${lines.map((line, index) => label(120, 48 + index * 18, line, index === 0 ? 16 : 13, index === 0 ? 700 : 500)).join("")}`)),
+    svg: svg(frame(`${badge(20, 16, badgeText)}${top}`)),
     altText: lines.join(". ")
   };
 }
@@ -389,7 +418,7 @@ export function similarityVisual(scale: number, caption: string): VisualAssetSpe
   const large = `132,92 ${132 + 36 * scale},${92 - 56 * scale / 2} ${132 + 70 * scale},92`;
   return {
     kind: "geometry",
-    svg: svg(frame(`${badge(20, 16, caption)}<polygon points='${small}' fill='currentColor' fill-opacity='0.06' stroke='currentColor' stroke-width='2'/><polygon points='${large}' fill='currentColor' fill-opacity='0.1' stroke='currentColor' stroke-width='2'/><text x='82' y='100' font-size='11' fill='currentColor'>1x</text><text x='176' y='100' font-size='11' fill='currentColor'>${scale}x</text>`)),
+    svg: svg(frame(`${badge(20, 16, caption)}<polygon points='${small}' fill='currentColor' fill-opacity='0.06' stroke='currentColor' stroke-width='2'/><polygon points='${large}' fill='currentColor' fill-opacity='0.1' stroke='currentColor' stroke-width='2'/>${svgSingleLineText(82, 100, "1x", { size: 11, maxWidth: 36 })}${svgSingleLineText(176, 100, `${scale}x`, { size: 11, maxWidth: 44 })}`)),
     altText: `Similar triangles scaled by ${scale}`
   };
 }
@@ -482,7 +511,7 @@ export function parabolaVisual(a: number, h: number, k: number, caption: string)
   }).join(" ");
   return {
     kind: "graph",
-    svg: svg(frame(`<line x1='30' y1='88' x2='206' y2='88' stroke='currentColor' stroke-width='2'/><line x1='44' y1='20' x2='44' y2='102' stroke='currentColor' stroke-width='2'/><path d='${path}' fill='none' stroke='currentColor' stroke-width='2.3'/><circle cx='${toX(h)}' cy='${toY(k)}' r='4.5' fill='currentColor'/><text x='${toX(h) + 8}' y='${toY(k) - 8}' font-size='10' fill='currentColor'>vertex</text>${badge(20, 16, caption)}`)),
+    svg: svg(frame(`<line x1='30' y1='88' x2='206' y2='88' stroke='currentColor' stroke-width='2'/><line x1='44' y1='20' x2='44' y2='102' stroke='currentColor' stroke-width='2'/><path d='${path}' fill='none' stroke='currentColor' stroke-width='2.3'/><circle cx='${toX(h)}' cy='${toY(k)}' r='4.5' fill='currentColor'/>${svgSingleLineText(toX(h) + 24, toY(k) - 8, "vertex", { size: 10, anchor: "start", maxWidth: 54 })}${badge(20, 16, caption)}`)),
     altText: `Parabola with vertex at ${h}, ${k}`
   };
 }
@@ -509,7 +538,7 @@ export function polynomialRootsVisual(r1: number, r2: number, caption: string): 
   const toX = (x: number) => 44 + x * 18;
   return {
     kind: "formula",
-    svg: svg(frame(`<line x1='30' y1='74' x2='210' y2='74' stroke='currentColor' stroke-width='2'/><line x1='44' y1='28' x2='44' y2='98' stroke='currentColor' stroke-width='2'/><path d='M${toX(1)} 42 Q ${toX((r1 + r2) / 2)} 8 ${toX(9)} 42' fill='none' stroke='currentColor' stroke-width='2.2'/><circle cx='${toX(r1)}' cy='74' r='4.5' fill='currentColor'/><circle cx='${toX(r2)}' cy='74' r='4.5' fill='currentColor'/><text x='${toX(r1)}' y='92' font-size='10' text-anchor='middle' fill='currentColor'>${r1}</text><text x='${toX(r2)}' y='92' font-size='10' text-anchor='middle' fill='currentColor'>${r2}</text>${badge(20, 16, caption)}`)),
+    svg: svg(frame(`<line x1='30' y1='74' x2='210' y2='74' stroke='currentColor' stroke-width='2'/><line x1='44' y1='28' x2='44' y2='98' stroke='currentColor' stroke-width='2'/><path d='M${toX(1)} 42 Q ${toX((r1 + r2) / 2)} 8 ${toX(9)} 42' fill='none' stroke='currentColor' stroke-width='2.2'/><circle cx='${toX(r1)}' cy='74' r='4.5' fill='currentColor'/><circle cx='${toX(r2)}' cy='74' r='4.5' fill='currentColor'/>${svgSingleLineText(toX(r1), 92, String(r1), { size: 10, maxWidth: 24 })}${svgSingleLineText(toX(r2), 92, String(r2), { size: 10, maxWidth: 24 })}${badge(20, 16, caption)}`)),
     altText: `Quadratic roots at ${r1} and ${r2}`
   };
 }
@@ -536,7 +565,7 @@ export function trigTriangleVisual(adjacent: number, opposite: number, caption: 
   const hypotenuse = Math.sqrt(adjacent * adjacent + opposite * opposite);
   return {
     kind: "geometry",
-    svg: svg(frame(`${badge(20, 16, caption)}<polygon points='64,90 64,42 170,90' fill='currentColor' fill-opacity='0.06' stroke='currentColor' stroke-width='2.3'/><rect x='64' y='80' width='10' height='10' fill='none' stroke='currentColor' stroke-width='2'/><text x='112' y='102' font-size='11' fill='currentColor'>adj ${adjacent}</text><text x='46' y='68' font-size='11' fill='currentColor'>opp ${opposite}</text><text x='138' y='58' font-size='11' fill='currentColor'>hyp ${hypotenuse.toFixed(1)}</text>`)),
+    svg: svg(frame(`${badge(20, 16, caption)}<polygon points='64,90 64,42 170,90' fill='currentColor' fill-opacity='0.06' stroke='currentColor' stroke-width='2.3'/><rect x='64' y='80' width='10' height='10' fill='none' stroke='currentColor' stroke-width='2'/>${svgSingleLineText(112, 102, `adj ${adjacent}`, { size: 11, maxWidth: 58 })}${svgSingleLineText(46, 68, `opp ${opposite}`, { size: 11, anchor: "start", maxWidth: 44 })}${svgSingleLineText(138, 58, `hyp ${hypotenuse.toFixed(1)}`, { size: 11, maxWidth: 64 })}`)),
     altText: `Right triangle with adjacent ${adjacent}, opposite ${opposite}, hypotenuse ${hypotenuse.toFixed(1)}`
   };
 }
@@ -564,7 +593,7 @@ export function circleGeometryVisual(radius: number, angle: number, caption: str
   const py = cy + Math.sin((angle - 90) * Math.PI / 180) * r;
   return {
     kind: "geometry",
-    svg: svg(frame(`${badge(20, 16, caption)}<circle cx='${cx}' cy='${cy}' r='${r}' fill='currentColor' fill-opacity='0.05' stroke='currentColor' stroke-width='2'/><line x1='${cx}' y1='${cy}' x2='${px}' y2='${py}' stroke='currentColor' stroke-width='2'/><line x1='${cx}' y1='${cy}' x2='${cx + r}' y2='${cy}' stroke='currentColor' stroke-width='2' stroke-opacity='0.5'/><path d='M ${cx + 12} ${cy} A 12 12 0 0 1 ${cx + Math.cos((angle - 90) * Math.PI / 180) * 12} ${cy + Math.sin((angle - 90) * Math.PI / 180) * 12}' fill='none' stroke='currentColor' stroke-width='1.5'/><text x='${cx + 16}' y='${cy - 6}' font-size='10' fill='currentColor'>${angle}°</text><text x='${cx + r + 12}' y='${cy + 4}' font-size='10' fill='currentColor'>r=${radius}</text>`)),
+    svg: svg(frame(`${badge(20, 16, caption)}<circle cx='${cx}' cy='${cy}' r='${r}' fill='currentColor' fill-opacity='0.05' stroke='currentColor' stroke-width='2'/><line x1='${cx}' y1='${cy}' x2='${px}' y2='${py}' stroke='currentColor' stroke-width='2'/><line x1='${cx}' y1='${cy}' x2='${cx + r}' y2='${cy}' stroke='currentColor' stroke-width='2' stroke-opacity='0.5'/><path d='M ${cx + 12} ${cy} A 12 12 0 0 1 ${cx + Math.cos((angle - 90) * Math.PI / 180) * 12} ${cy + Math.sin((angle - 90) * Math.PI / 180) * 12}' fill='none' stroke='currentColor' stroke-width='1.5'/>${svgSingleLineText(cx + 22, cy - 6, `${angle}°`, { size: 10, anchor: "start", maxWidth: 32 })}${svgSingleLineText(cx + r + 12, cy + 4, `r=${radius}`, { size: 10, anchor: "start", maxWidth: 40 })}`)),
     altText: `Circle geometry visual radius ${radius} angle ${angle}`
   };
 }

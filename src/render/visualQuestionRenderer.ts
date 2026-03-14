@@ -1,4 +1,5 @@
 import type { SkillId, VisualAssetSpec } from "../domain/types";
+import { estimateTextWidth, fitSingleLineText, svgSingleLineText, svgTextBlock } from "./svgText";
 
 const SVG_HEAD =
   "xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120' preserveAspectRatio='xMidYMid meet' shape-rendering='geometricPrecision' text-rendering='geometricPrecision'";
@@ -20,11 +21,12 @@ function frame(inner: string): string {
 }
 
 function badge(x: number, y: number, text: string): string {
-  const width = Math.max(22, text.length * 6 + 10);
+  const fitted = fitSingleLineText(text, 96, 9, 6.5);
+  const width = Math.max(22, Math.min(108, Math.ceil(estimateTextWidth(fitted.text, fitted.fontSize) + 12)));
   return `
     <g transform='translate(${x} ${y})'>
       <rect x='0' y='0' width='${width}' height='16' rx='8' fill='currentColor' fill-opacity='0.14' stroke='currentColor' stroke-width='1.5'/>
-      <text x='${width / 2}' y='11' text-anchor='middle' font-size='9' font-weight='700' fill='currentColor'>${text}</text>
+      ${svgSingleLineText(width / 2, 11, fitted.text, { size: fitted.fontSize, minSize: 6.5, maxWidth: width - 10 })}
     </g>
   `;
 }
@@ -48,9 +50,17 @@ function starIcon(cx: number, cy: number, size: number): string {
 }
 
 function outlinedText(x: number, y: number, text: string, fontSize: number, anchor = "middle"): string {
-  return `
-    <text x='${x}' y='${y}' text-anchor='${anchor}' font-size='${fontSize}' font-weight='700' stroke='currentColor' stroke-opacity='0.16' stroke-width='2' paint-order='stroke' fill='currentColor'>${text}</text>
-  `;
+  return svgSingleLineText(x, y, text, {
+    size: fontSize,
+    minSize: Math.max(7, fontSize - 4),
+    anchor: anchor as "start" | "middle" | "end",
+    maxWidth: anchor === "middle" ? 180 : 130,
+    stroke: "currentColor",
+    strokeOpacity: 0.16,
+    strokeWidth: 2,
+    paintOrder: "stroke",
+    weight: 700
+  });
 }
 
 function lessonScene(inner: string, altText: string): VisualAssetSpec {
@@ -310,7 +320,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <circle cx='140' cy='42' r='7' fill='currentColor'/>
           <circle cx='164' cy='42' r='7' fill='currentColor'/>
           <circle cx='188' cy='42' r='7' fill='currentColor'/>
-          <text x='22' y='108' font-size='14' fill='currentColor'>2 tens + 4 ones</text>
+          ${svgSingleLineText(120, 104, "2 tens + 4 ones", { size: 14, minSize: 8, maxWidth: 188 })}
         `,
         "Place value lesson with tens rods and ones dots"
       );
@@ -324,7 +334,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <text x='100' y='50' font-size='16' fill='currentColor'>4</text>
           <text x='136' y='50' font-size='18' fill='currentColor'>=</text>
           <text x='172' y='50' font-size='16' fill='currentColor'>7</text>
-          <text x='42' y='96' font-size='14' fill='currentColor'>Make one fact</text>
+          ${svgSingleLineText(120, 96, "Make one fact", { size: 14, minSize: 8, maxWidth: 184 })}
         `,
         "Addition lesson showing two parts and total"
       );
@@ -347,8 +357,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <path d='M84 56 L84 28 A28 28 0 0 1 108 70 Z' fill='currentColor'/>
           <line x1='84' y1='28' x2='84' y2='84' stroke='currentColor' stroke-width='2'/>
           <line x1='56' y1='56' x2='112' y2='56' stroke='currentColor' stroke-width='2'/>
-          <text x='130' y='46' font-size='15' fill='currentColor'>equal</text>
-          <text x='130' y='66' font-size='15' fill='currentColor'>parts</text>
+          ${svgTextBlock(164, 56, "equal parts", { size: 15, minSize: 8, maxWidth: 86, maxLines: 2 })}
         `,
         "Fraction lesson with circle split into equal parts"
       );
@@ -387,7 +396,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <rect x='58' y='32' width='28' height='28' fill='currentColor' opacity='0.85'/>
           <rect x='102' y='24' width='36' height='36' fill='currentColor' opacity='0.7'/>
           <text x='156' y='52' font-size='18' fill='currentColor'>?</text>
-          <text x='34' y='96' font-size='14' fill='currentColor'>look for the rule</text>
+          ${svgSingleLineText(120, 96, "look for the rule", { size: 14, minSize: 8, maxWidth: 184 })}
         `,
         "Pattern lesson with growing blocks"
       );
@@ -461,7 +470,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <text x='48' y='60' font-size='14' fill='currentColor'>1</text>
           <text x='96' y='60' font-size='14' fill='currentColor'>5</text>
           <text x='141' y='60' font-size='14' fill='currentColor'>10</text>
-          <text x='52' y='98' font-size='14' fill='currentColor'>count cents</text>
+          ${svgSingleLineText(120, 98, "count cents", { size: 14, minSize: 8, maxWidth: 184 })}
         `,
         "Money lesson with penny nickel dime values"
       );
@@ -471,8 +480,8 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <circle cx='86' cy='56' r='34' fill='none' stroke='currentColor' stroke-width='3'/>
           <line x1='86' y1='56' x2='86' y2='34' stroke='currentColor' stroke-width='3'/>
           <line x1='86' y1='56' x2='106' y2='56' stroke='currentColor' stroke-width='2'/>
-          <text x='136' y='48' font-size='14' fill='currentColor'>:00 full hour</text>
-          <text x='136' y='68' font-size='14' fill='currentColor'>:30 half hour</text>
+          ${svgTextBlock(164, 48, ":00 full hour", { size: 14, minSize: 8, maxWidth: 86, maxLines: 2 })}
+          ${svgTextBlock(164, 72, ":30 half hour", { size: 14, minSize: 8, maxWidth: 86, maxLines: 2 })}
         `,
         "Clock lesson with hands and full or half hour labels"
       );
@@ -487,7 +496,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <circle cx='158' cy='50' r='9' fill='currentColor'/>
           <circle cx='180' cy='50' r='9' fill='currentColor'/>
           <text x='64' y='54' font-size='14' fill='currentColor'>?</text>
-          <text x='72' y='100' font-size='14' fill='currentColor'>keep both sides equal</text>
+          ${svgSingleLineText(120, 100, "keep both sides equal", { size: 14, minSize: 8, maxWidth: 184 })}
         `,
         "Balance lesson with unknown on one side and counters on the other"
       );
