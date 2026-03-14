@@ -98,9 +98,10 @@ function numberChoice(correct: number, offsets: [number, number, number]): { opt
 
 const SVG_HEAD =
   "xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120' preserveAspectRatio='xMidYMid meet' shape-rendering='geometricPrecision' text-rendering='geometricPrecision'";
+const GUIDED_SVG_INK = "#f2f7ff";
 
 function svg(inner: string): string {
-  return `<svg ${SVG_HEAD} role='img'>${inner}</svg>`;
+  return `<svg ${SVG_HEAD} role='img'>${inner.replaceAll("currentColor", GUIDED_SVG_INK)}</svg>`;
 }
 
 function scene(inner: string): string {
