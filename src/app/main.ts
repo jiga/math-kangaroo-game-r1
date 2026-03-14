@@ -197,8 +197,15 @@ function syncViewportMetrics(): void {
   const viewport = window.visualViewport;
   const layoutWidth = window.innerWidth || 240;
   const layoutHeight = window.innerHeight || 282;
-  const width = Math.max(180, Math.floor(Math.min(240, viewport?.width ?? layoutWidth)));
-  const height = Math.max(220, Math.floor(Math.min(282, viewport?.height ?? layoutHeight)));
+  const rawWidth = Math.floor(viewport?.width ?? layoutWidth);
+  const rawHeight = Math.floor(viewport?.height ?? layoutHeight);
+  const r1Sized = rawWidth <= 260 && rawHeight <= 300;
+  const width = r1Sized
+    ? Math.max(180, Math.min(240, rawWidth))
+    : Math.max(280, Math.min(460, rawWidth - 24));
+  const height = r1Sized
+    ? Math.max(220, Math.min(282, rawHeight))
+    : Math.max(420, Math.min(920, rawHeight - 20));
   const topInset = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
   const bottomInset = Math.max(0, Math.round(layoutHeight - ((viewport?.offsetTop ?? 0) + (viewport?.height ?? layoutHeight))));
   const sideInset = Math.max(
@@ -211,6 +218,7 @@ function syncViewportMetrics(): void {
   document.body.style.setProperty("--safe-bottom", `${Math.max(height < 270 ? 3 : 4, bottomInset)}px`);
   document.body.style.setProperty("--safe-side", `${Math.max(4, sideInset)}px`);
   document.body.dataset.compactHeight = height < 270 ? "true" : "false";
+  document.body.dataset.roomy = !r1Sized && (width >= 320 || height >= 520) ? "true" : "false";
 }
 
 function hideActionHint(): void {

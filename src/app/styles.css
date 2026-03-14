@@ -42,8 +42,8 @@ body {
 }
 
 .app {
-  width: min(240px, var(--viewport-width));
-  height: min(282px, var(--viewport-height));
+  width: min(100%, var(--viewport-width));
+  height: min(100%, var(--viewport-height));
   margin: 0 auto;
   position: relative;
   padding-top: calc(var(--safe-top) + env(safe-area-inset-top, 0px));
@@ -1076,6 +1076,228 @@ h2 {
 .result-line {
   font-size: 11px;
   margin-top: 4px;
+}
+
+body[data-roomy="true"] .screen.active {
+  gap: 8px;
+}
+
+body[data-roomy="true"] .card {
+  padding: 8px;
+  border-radius: 16px;
+}
+
+body[data-roomy="true"] h1 {
+  font-size: 18px;
+}
+
+body[data-roomy="true"] h2 {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+body[data-roomy="true"] .btn {
+  min-height: 38px;
+  font-size: 15px;
+  letter-spacing: 0.9px;
+}
+
+body[data-roomy="true"] .btn-theme,
+body[data-roomy="true"] .btn-mode {
+  font-size: 11px;
+}
+
+body[data-roomy="true"] .grade-grid {
+  gap: 6px;
+}
+
+body[data-roomy="true"] .grade-grid .btn {
+  min-height: 42px;
+  font-size: 17px;
+}
+
+body[data-roomy="true"] .btn-start {
+  min-height: 48px;
+  font-size: 22px;
+}
+
+body[data-roomy="true"] .icon-btn {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+}
+
+body[data-roomy="true"] .icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+body[data-roomy="true"] .hud-bar {
+  padding: 4px;
+}
+
+body[data-roomy="true"] .hud-item {
+  min-height: 24px;
+  font-size: 10px;
+  gap: 5px;
+  padding: 0 8px;
+}
+
+body[data-roomy="true"] .hud-label {
+  font-size: 8px;
+}
+
+body[data-roomy="true"] .topic-browser-intro,
+body[data-roomy="true"] .topic-card-summary,
+body[data-roomy="true"] .topic-card-skills,
+body[data-roomy="true"] .question-meta,
+body[data-roomy="true"] .mode-info,
+body[data-roomy="true"] .action-hint {
+  font-size: 11px;
+}
+
+body[data-roomy="true"] .topic-card {
+  padding: 10px;
+  border-radius: 14px;
+}
+
+body[data-roomy="true"] .topic-card-title,
+body[data-roomy="true"] .guided-topic-title,
+body[data-roomy="true"] .learn-step-title {
+  font-size: 14px;
+}
+
+body[data-roomy="true"] .guided-step-index,
+body[data-roomy="true"] .learn-step-index {
+  font-size: 11px;
+}
+
+body[data-roomy="true"] .guided-back {
+  min-height: 28px;
+  min-width: 72px;
+  font-size: 10px;
+}
+
+body[data-roomy="true"] .guided-step-title,
+body[data-roomy="true"] .learn-step-prompt,
+body[data-roomy="true"] .guided-choice-prompt {
+  font-size: 15px;
+}
+
+body[data-roomy="true"] .guided-derivation,
+body[data-roomy="true"] .learn-objective {
+  font-size: 10px;
+  padding: 5px 8px;
+}
+
+body[data-roomy="true"] .guided-visual {
+  height: 160px;
+  min-height: 160px;
+}
+
+body[data-roomy="true"] .guided-step-body,
+body[data-roomy="true"] .learn-step-body,
+body[data-roomy="true"] .coach-body,
+body[data-roomy="true"] .guided-choice-feedback,
+body[data-roomy="true"] .learn-feedback {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+body[data-roomy="true"] .guided-controls {
+  padding: 8px;
+  gap: 6px;
+}
+
+body[data-roomy="true"] .guided-param-strip {
+  gap: 6px;
+}
+
+body[data-roomy="true"] .guided-param-chip {
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+body[data-roomy="true"] .guided-param-name {
+  font-size: 9px;
+}
+
+body[data-roomy="true"] .guided-param-value {
+  font-size: 13px;
+}
+
+body[data-roomy="true"] .guided-control-label,
+body[data-roomy="true"] .guided-control-hint {
+  font-size: 10px;
+}
+
+body[data-roomy="true"] .guided-control-value {
+  font-size: 15px;
+}
+
+body[data-roomy="true"] .guided-control-step {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  font-size: 16px;
+}
+
+body[data-roomy="true"] .guided-toggle-btn {
+  min-height: 32px;
+  font-size: 11px;
+}
+
+body[data-roomy="true"] .guided-choice-option,
+body[data-roomy="true"] .learn-option {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+body[data-roomy="true"] .question-text {
+  font-size: 28px;
+  line-height: 1.25;
+}
+
+body[data-roomy="true"] .question-visual[data-kind="broken_line"] svg,
+body[data-roomy="true"] .question-visual[data-kind="pictograph"] svg,
+body[data-roomy="true"] .question-visual[data-kind="region_compare"] svg,
+body[data-roomy="true"] .question-visual[data-kind="venn"] svg,
+body[data-roomy="true"] .question-visual[data-kind="maze"] svg {
+  max-height: 150px;
+}
+
+body[data-roomy="true"] .option {
+  min-height: 42px;
+  font-size: 20px;
+  padding: 6px 10px;
+}
+
+body[data-roomy="true"] .coach-mode-row .btn,
+body[data-roomy="true"] .coach-bottom .btn,
+body[data-roomy="true"] .result-actions .btn,
+body[data-roomy="true"] .guided-actions .btn {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+body[data-roomy="true"] .coach-visual {
+  min-height: 120px;
+  max-height: 160px;
+}
+
+body[data-roomy="true"] .result-line {
+  font-size: 16px;
+}
+
+body[data-roomy="true"] .scroll-rail {
+  width: 12px;
+}
+
+body[data-roomy="true"] .scroll-rail-step {
+  min-height: 18px;
+  font-size: 10px;
 }
 
 body[data-compact-height="true"] {
