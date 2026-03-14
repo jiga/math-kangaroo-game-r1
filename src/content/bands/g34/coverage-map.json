@@ -1,0 +1,21 @@
+{
+  "bandId": "g34",
+  "grades": [3, 4],
+  "targetTemplates": 300,
+  "contestQuestions": 24,
+  "pointDistribution": { "3": 0.4, "4": 0.35, "5": 0.25 },
+  "curriculum": [
+    { "skillId": "multi_digit_add_sub", "title": "Multi-digit Addition and Subtraction", "domain": "number", "lessonTopic": "operations_place_value", "summary": "Fluent multi-step addition and subtraction in story and table settings.", "requiredTemplates": 25, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "multiplication_division", "title": "Multiplication and Division", "domain": "number", "lessonTopic": "multiplicative_thinking", "summary": "Equal groups, arrays, missing factors, and inverse reasoning.", "requiredTemplates": 25, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "place_value_rounding", "title": "Place Value and Rounding", "domain": "number", "lessonTopic": "operations_place_value", "summary": "Compare, compose, and round with hundreds and thousands.", "requiredTemplates": 25, "requiredFamilies": 4 },
+    { "skillId": "fractions_parts", "title": "Fractions and Equal Parts", "domain": "fractions", "lessonTopic": "fractions_shares", "summary": "Unit fractions, equivalent visual shares, and fraction of a quantity.", "requiredTemplates": 25, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "measurement_time_money", "title": "Measurement, Time, and Money", "domain": "measurement", "lessonTopic": "measurement_data", "summary": "Clock, elapsed time, money totals, and unit reasoning.", "requiredTemplates": 25, "requiredFamilies": 4 },
+    { "skillId": "perimeter_area_intro", "title": "Perimeter and Area", "domain": "geometry", "lessonTopic": "geometry_space", "summary": "Perimeter tracing, unit squares, and rectangle reasoning.", "requiredTemplates": 25, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "shapes_angles", "title": "Shapes and Angles", "domain": "geometry", "lessonTopic": "geometry_space", "summary": "Classify polygons, angle turns, and symmetry clues.", "requiredTemplates": 25, "requiredFamilies": 4 },
+    { "skillId": "patterns_equations", "title": "Patterns and Equations", "domain": "algebra", "lessonTopic": "patterns_equations", "summary": "Function machines, missing values, and growing patterns.", "requiredTemplates": 25, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "data_graphs", "title": "Data and Graphs", "domain": "data", "lessonTopic": "measurement_data", "summary": "Read tables, bar graphs, and picture graphs accurately.", "requiredTemplates": 25, "requiredFamilies": 4 },
+    { "skillId": "logic_elimination", "title": "Logic and Elimination", "domain": "logic", "lessonTopic": "exam_labs", "summary": "Use clues, elimination, and parity-style reasoning.", "requiredTemplates": 25, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "coordinates_paths", "title": "Coordinates and Paths", "domain": "geometry", "lessonTopic": "coordinates_paths", "summary": "Read simple grids, paths, and movement rules.", "requiredTemplates": 25, "requiredFamilies": 4 },
+    { "skillId": "solids_nets", "title": "Solids and Nets", "domain": "geometry", "lessonTopic": "geometry_space", "summary": "Cube views, hidden faces, and folding nets.", "requiredTemplates": 25, "requiredFamilies": 4, "highValue": true }
+  ]
+}

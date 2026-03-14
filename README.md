@@ -1,6 +1,6 @@
-# Math Kangaroo R1 (Production Grade 1-2 Trainer)
+# Math Kangaroo R1 (Production Grade 1-12 Trainer)
 
-This build is optimized for Rabbit r1 and now prioritizes Grade 1-2 competition preparation with curriculum-complete coverage, official format fidelity, adaptive practice progression, deterministic coaching, and optional LLM enrichment.
+This build is optimized for Rabbit r1 and now supports Grade 1-12 competition preparation with banded content, guided lessons, official-format mocks, adaptive practice progression, deterministic coaching, and optional LLM enrichment.
 
 Related docs:
 
@@ -12,7 +12,8 @@ Related docs:
 
 - Modular source architecture under `src/` with generated single-file output.
 - Grade 1-2 question bank rebuilt from curriculum coverage map.
-- Contest fidelity for Grade 1-2:
+- Grade 3-12 migrated onto the same banded architecture, with guided lessons and official mock sizing by band.
+- Contest fidelity by official Math Kangaroo band:
   - 24 questions
   - 75 minutes
   - 5 options per question
@@ -20,7 +21,7 @@ Related docs:
   - no wrong-answer penalty
 - Practice progression:
   - `Diagnostic -> Mastery -> Mock`
-- Visual puzzle support for Grade 1-2 (SVG):
+- Visual puzzle support across the bands (SVG):
   - mazes
   - broken lines/perimeter
   - pictographs
@@ -31,7 +32,7 @@ Related docs:
 - Deterministic per-skill coaching with optional LLM rewrite layer.
 - Voice queue synchronization to avoid stale/out-of-order speech.
 - Persistent on-device profile (`localStorage` key: `mk_profile_v2`).
-- Grade 3-12 remain available via fallback generators.
+- Grade 3-12 now run through the same banded content pipeline as Grade 1-2, with guided lessons, adaptive practice, and official-format contest generation by band.
 
 ## Structure
 
@@ -48,6 +49,16 @@ src/
       coverage-map.json
       templates.ts
       bank.ts
+    bands/
+      g12/
+      g34/
+      g56/
+      g78/
+      g910/
+      g1112/
+      guidedFactory.ts
+      visuals.ts
+      index.ts
     validateBank.ts
   engine/
     practiceEngine.ts
@@ -60,8 +71,6 @@ src/
     profileStore.ts
   render/
     visualQuestionRenderer.ts
-  legacy/
-    grade3plus.ts
 
 dist/
   index.html
@@ -74,7 +83,7 @@ scripts/
 ## Build and Validate
 
 - Install deps: `npm install`
-- Validate Grade 1-2 coverage and schema: `npm run validate`
+- Validate Grade 1-12 coverage and schema: `npm run validate`
 - Run tests: `npm run test`
 - Build single-file artifact: `npm run build`
 
@@ -120,5 +129,5 @@ Then generate the r1 QR from that stable HTTPS URL:
 
 ## Notes
 
-- Scope focus in this release is Grade 1-2 quality and coaching depth.
+- The app now uses the official Math Kangaroo grade bands (1-2, 3-4, 5-6, 7-8, 9-10, 11-12) across learn, practice, and contest modes.
 - Official questions are not copied verbatim; items are original but pattern-matched.

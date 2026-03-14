@@ -72,6 +72,52 @@ function mergeChoice(base: ChoiceStepDef, override?: Partial<ChoiceStepDef>): Ch
   };
 }
 
+const DEFAULT_BLUEPRINT: LessonBlueprint = {
+  objective: "Use structure first, then compute only what matters.",
+  intro: "Start by naming the quantities, the rule, and the target. Contest math gets easier when the structure is clear.",
+  trap: "Many misses come from solving too fast before identifying what stays the same or what the question is really asking.",
+  tipSheet: ["Rewrite the target in your own words.", "Cross out impossible choices before calculating."],
+  quickCheck: {
+    prompt: "Which move should come first?",
+    options: ["Name the rule or target", "Guess from the choices", "Compute every detail"],
+    correctIndex: 0,
+    success: "Right. Start by naming the rule or target.",
+    wrong: "First decide what the question is asking and what rule connects the numbers."
+  },
+  transfer: {
+    prompt: "What is the fastest safe move on a hard contest question?",
+    options: ["Spot structure and eliminate choices", "Do every calculation twice", "Pick the biggest number"],
+    correctIndex: 0,
+    success: "Exactly. Structure and elimination save time.",
+    wrong: "On contest questions, structure and elimination usually save the most time."
+  }
+};
+
+function genericBlueprint(question: QuestionInstance, coach: CoachPack): LessonBlueprint {
+  const leadTag = question.strategyTags[0] || "spot the pattern";
+  const followTag = question.strategyTags[1] || "check one small step";
+  return {
+    objective: `Use ${leadTag} to solve ${question.familyId.replaceAll("_", " ")}.`,
+    intro: `${coach.hint} Start by deciding what must stay true, what can change, and which quantity you actually need.`,
+    trap: question.trapWarning || coach.errorDiagnosis,
+    tipSheet: [leadTag, followTag],
+    quickCheck: {
+      prompt: `Which habit best matches this family?`,
+      options: [leadTag, "Compute every number immediately", "Ignore the diagram and read only the choices"],
+      correctIndex: 0,
+      success: `Yes. ${leadTag} is the right opening move here.`,
+      wrong: `Use ${leadTag} first, then compute only what survives.`
+    },
+    transfer: {
+      prompt: `What is the best next habit after you use ${leadTag}?`,
+      options: [followTag, "Restart from scratch", "Pick the longest answer"],
+      correctIndex: 0,
+      success: `Correct. ${followTag} keeps the work clean.`,
+      wrong: `${followTag} is the steady follow-up move after the first insight.`
+    }
+  };
+}
+
 const SKILL_BLUEPRINTS: Record<SkillId, LessonBlueprint> = {
   counting_ordering: {
     objective: "Count in order without losing your place.",
@@ -745,8 +791,8 @@ function buildCheckStep(
   };
 }
 
-function lessonFor(question: QuestionInstance): LessonBlueprint {
-  const base = SKILL_BLUEPRINTS[question.skillId];
+function lessonFor(question: QuestionInstance, coach: CoachPack): LessonBlueprint {
+  const base = SKILL_BLUEPRINTS[question.skillId] || genericBlueprint(question, coach) || DEFAULT_BLUEPRINT;
   const override = FAMILY_OVERRIDES[question.familyId];
   if (!override) return base;
   return {
@@ -760,7 +806,7 @@ function lessonFor(question: QuestionInstance): LessonBlueprint {
 }
 
 export function buildConceptLab(question: QuestionInstance, coach: CoachPack, mode: ConceptLabMode): ConceptLabFlow {
-  const lesson = lessonFor(question);
+  const lesson = lessonFor(question, coach);
   const conceptVisual = renderLessonScene(question.skillId, 1);
   const questionVisual = question.visualAssetSpec || renderLessonScene(question.skillId, 2);
   const speedVisual = renderLessonScene(question.skillId, 3);

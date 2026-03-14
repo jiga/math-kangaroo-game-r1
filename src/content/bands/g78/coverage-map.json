@@ -1,0 +1,21 @@
+{
+  "bandId": "g78",
+  "grades": [7, 8],
+  "targetTemplates": 340,
+  "contestQuestions": 30,
+  "pointDistribution": { "3": 0.4, "4": 0.35, "5": 0.25 },
+  "curriculum": [
+    { "skillId": "integers_rationals", "title": "Integers and Rational Numbers", "domain": "number", "lessonTopic": "algebra_core", "summary": "Signed operations, ordering, and rational comparisons.", "requiredTemplates": 29, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "linear_equations", "title": "Linear Equations", "domain": "algebra", "lessonTopic": "algebra_core", "summary": "Solve one- and two-step equations and unknown-value setups.", "requiredTemplates": 29, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "ratios_proportions", "title": "Ratios and Proportions", "domain": "proportional", "lessonTopic": "ratios_percents", "summary": "Scale drawings, unit rates, and proportional tables.", "requiredTemplates": 29, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "percent_change", "title": "Percents and Percent Change", "domain": "proportional", "lessonTopic": "ratios_percents", "summary": "Discount, markup, and percent increase/decrease.", "requiredTemplates": 29, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "geometry_angles_triangles", "title": "Geometry, Angles, and Triangles", "domain": "geometry", "lessonTopic": "geometry_reasoning", "summary": "Triangle angle sums, exterior angles, and polygon angle logic.", "requiredTemplates": 28, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "area_volume_scale", "title": "Area, Volume, and Scale", "domain": "geometry", "lessonTopic": "geometry_reasoning", "summary": "Scale effects, area/volume formulas, and composite figures.", "requiredTemplates": 28, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "coordinate_geometry", "title": "Coordinate Geometry", "domain": "geometry", "lessonTopic": "graphs_functions", "summary": "Distance on grids, midpoint intuition, and graph reading.", "requiredTemplates": 28, "requiredFamilies": 5 },
+    { "skillId": "combinatorics_counting", "title": "Combinatorics and Counting", "domain": "logic", "lessonTopic": "counting_probability", "summary": "Systematic counting, arrangements, and casework.", "requiredTemplates": 28, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "probability_expected", "title": "Probability", "domain": "logic", "lessonTopic": "counting_probability", "summary": "Outcome spaces, equally likely events, and simple expected value.", "requiredTemplates": 28, "requiredFamilies": 5 },
+    { "skillId": "sequences_functions", "title": "Sequences and Functions", "domain": "algebra", "lessonTopic": "graphs_functions", "summary": "Tables, linear growth, and recursive-to-explicit reasoning.", "requiredTemplates": 28, "requiredFamilies": 5 },
+    { "skillId": "algebraic_manipulation", "title": "Algebraic Manipulation", "domain": "algebra", "lessonTopic": "algebra_core", "summary": "Simplify expressions, distribute, and combine like terms.", "requiredTemplates": 28, "requiredFamilies": 5 },
+    { "skillId": "logical_reasoning", "title": "Logical Reasoning", "domain": "logic", "lessonTopic": "exam_labs", "summary": "Elimination, parity, invariants, and clever contest shortcuts.", "requiredTemplates": 28, "requiredFamilies": 5, "highValue": true }
+  ]
+}

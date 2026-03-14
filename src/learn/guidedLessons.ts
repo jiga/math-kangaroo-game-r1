@@ -1,60 +1,14 @@
-import type { Grade, SkillId, VisualAssetSpec } from "../domain/types";
+import type { Grade, SkillId } from "../domain/types";
+import type { GuidedTopic, GuidedTopicId, LessonValue } from "./guidedTypes";
 import { renderBrokenLine, renderCube, renderPictograph, renderSymmetry, renderVenn } from "../render/visualQuestionRenderer";
+import { GUIDED_TOPICS as G34_TOPICS } from "../content/bands/g34/guidedLessons";
+import { GUIDED_TOPICS as G56_TOPICS } from "../content/bands/g56/guidedLessons";
+import { GUIDED_TOPICS as G78_TOPICS } from "../content/bands/g78/guidedLessons";
+import { GUIDED_TOPICS as G910_TOPICS } from "../content/bands/g910/guidedLessons";
+import { GUIDED_TOPICS as G1112_TOPICS } from "../content/bands/g1112/guidedLessons";
 
-type LessonValue = number | string;
-export type GuidedTopicId =
-  | "counting_patterns"
-  | "compare_place_value"
-  | "add_sub_balance"
-  | "number_line_positions"
-  | "fractions_groups"
-  | "sorting_sets_logic"
-  | "measure_money_time"
-  | "shapes_space"
-  | "data_likelihood"
-  | "perimeter_regions";
+export type { GuidedControl, GuidedStage, GuidedTopic, GuidedTopicId } from "./guidedTypes";
 
-export type GuidedControl =
-  | {
-      kind: "range";
-      key: string;
-      label: string;
-      min: number;
-      max: number;
-      step?: number;
-      formatter?: (value: LessonValue) => string;
-    }
-  | {
-      kind: "toggle";
-      key: string;
-      label: string;
-      options: Array<{ label: string; value: LessonValue }>;
-    };
-
-export type GuidedStage = {
-  id: string;
-  title: string;
-  body: (values: Record<string, LessonValue>) => string;
-  derivation: (values: Record<string, LessonValue>) => string;
-  visual: (values: Record<string, LessonValue>) => VisualAssetSpec;
-  controls?: GuidedControl[];
-  prompt?: (values: Record<string, LessonValue>) => string;
-  options?: (values: Record<string, LessonValue>) => [string, string, string];
-  correctIndex?: (values: Record<string, LessonValue>) => number;
-  success?: (values: Record<string, LessonValue>) => string;
-  retry?: (values: Record<string, LessonValue>) => string;
-  speak?: (values: Record<string, LessonValue>) => string;
-};
-
-export type GuidedTopic = {
-  id: GuidedTopicId;
-  title: string;
-  summary: string;
-  skills: SkillId[];
-  grades: Grade[];
-  initialValues: Record<string, LessonValue>;
-  stages: GuidedStage[];
-};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -389,7 +343,7 @@ function regionVisual(left: number, right: number): VisualAssetSpec {
   };
 }
 
-const TOPICS: GuidedTopic[] = [
+const G12_TOPICS: GuidedTopic[] = [
   {
     id: "counting_patterns",
     title: "Counting + Patterns",
@@ -985,7 +939,8 @@ const TOPICS: GuidedTopic[] = [
 ];
 
 export function listGuidedTopics(grade: Grade): GuidedTopic[] {
-  return TOPICS.filter((topic) => topic.grades.includes(grade));
+  const allTopics = [...G12_TOPICS, ...G34_TOPICS, ...G56_TOPICS, ...G78_TOPICS, ...G910_TOPICS, ...G1112_TOPICS];
+  return allTopics.filter((topic) => topic.grades.includes(grade));
 }
 
 export function getGuidedTopic(grade: Grade, topicId: GuidedTopicId): GuidedTopic | null {

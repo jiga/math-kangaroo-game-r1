@@ -1,0 +1,21 @@
+{
+  "bandId": "g910",
+  "grades": [9, 10],
+  "targetTemplates": 360,
+  "contestQuestions": 30,
+  "pointDistribution": { "3": 0.4, "4": 0.35, "5": 0.25 },
+  "curriculum": [
+    { "skillId": "linear_systems", "title": "Linear Systems", "domain": "algebra", "lessonTopic": "algebra_models", "summary": "Solve systems from equations, tables, and word constraints.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "quadratic_patterns", "title": "Quadratic Patterns", "domain": "algebra", "lessonTopic": "functions_sequences", "summary": "Squares, differences, and factorable quadratics.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "exponents_surds", "title": "Exponents and Surds", "domain": "algebra", "lessonTopic": "algebra_models", "summary": "Exponent laws, radicals, and square-root structure.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "inequalities_absolute", "title": "Inequalities and Absolute Value", "domain": "algebra", "lessonTopic": "algebra_models", "summary": "Solve and reason about intervals and distance on a line.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "geometry_similarity", "title": "Geometry and Similarity", "domain": "geometry", "lessonTopic": "geometry_advanced", "summary": "Angle chase, similar triangles, and scale relationships.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "circles_coordinate", "title": "Circles and Coordinate Geometry", "domain": "geometry", "lessonTopic": "geometry_advanced", "summary": "Circle facts, chords, distance, and slope ideas.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "counting_probability", "title": "Counting and Probability", "domain": "logic", "lessonTopic": "probability_strategy", "summary": "Casework, permutations, combinations, and event probability.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "functions_graphs", "title": "Functions and Graphs", "domain": "algebra", "lessonTopic": "functions_sequences", "summary": "Interpret linear and quadratic relationships from graphs and tables.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "sequences_series", "title": "Sequences and Series", "domain": "algebra", "lessonTopic": "functions_sequences", "summary": "Arithmetic and geometric progressions with contest twists.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "number_theory_modular", "title": "Number Theory and Modular Reasoning", "domain": "number", "lessonTopic": "number_theory_strategy", "summary": "Remainders, divisibility, parity, and modular shortcuts.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "algebra_word_models", "title": "Algebra Word Models", "domain": "algebra", "lessonTopic": "algebra_models", "summary": "Translate word conditions into equations and solve efficiently.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "optimization_logic", "title": "Optimization and Logic", "domain": "logic", "lessonTopic": "exam_labs", "summary": "Extremes, invariants, and strategy-heavy contest problems.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true }
+  ]
+}

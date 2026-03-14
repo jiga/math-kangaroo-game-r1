@@ -1,15 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allGrade12Skills } from "../src/content/g1g2/bank";
+import { allBandSkills } from "../src/content/bands/index";
+import { hasSpecificGuidedBuilder } from "../src/content/bands/guidedFactory";
+import g34Coverage from "../src/content/bands/g34/coverage-map.json";
+import g56Coverage from "../src/content/bands/g56/coverage-map.json";
+import g78Coverage from "../src/content/bands/g78/coverage-map.json";
+import g910Coverage from "../src/content/bands/g910/coverage-map.json";
+import g1112Coverage from "../src/content/bands/g1112/coverage-map.json";
 import { guidedSkillCoverage, listGuidedTopics } from "../src/learn/guidedLessons";
 
-for (const grade of [1, 2] as const) {
+for (const grade of [1, 2, 3, 5, 7, 9, 11] as const) {
   test(`guided lessons cover every Grade ${grade} skill`, () => {
-    assert.deepEqual(new Set(guidedSkillCoverage(grade)), new Set(allGrade12Skills(grade)));
+    assert.deepEqual(new Set(guidedSkillCoverage(grade)), new Set(allBandSkills(grade)));
   });
 
   test(`guided lessons for Grade ${grade} expose interactive visuals and checks`, () => {
-    for (const topic of listGuidedTopics(grade)) {
+    const topics = listGuidedTopics(grade);
+    assert.ok(topics.length > 0, `grade ${grade} should have topics`);
+
+    for (const topic of topics) {
       assert.ok(topic.stages.length >= 3, `${topic.id} should have multiple stages`);
       assert.ok(topic.stages.some((stage) => (stage.controls || []).length > 0), `${topic.id} should have controls`);
       assert.ok(topic.stages.some((stage) => stage.prompt && stage.options && stage.correctIndex), `${topic.id} should have a quick check`);
@@ -33,6 +42,15 @@ for (const grade of [1, 2] as const) {
           assert.ok(new Set(options).size >= 2, `${topic.id}/${stage.id} options should not all be identical`);
         }
       }
+    }
+  });
+}
+
+
+for (const coverage of [g34Coverage, g56Coverage, g78Coverage, g910Coverage, g1112Coverage]) {
+  test(`guided builders are topic-specific for ${coverage.bandId}`, () => {
+    for (const topicKey of new Set(coverage.curriculum.map((row) => row.lessonTopic))) {
+      assert.equal(hasSpecificGuidedBuilder(coverage.bandId, topicKey), true, `${coverage.bandId}:${topicKey} should use a specific guided builder`);
     }
   });
 }

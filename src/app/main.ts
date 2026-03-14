@@ -1,7 +1,11 @@
 import type { Grade, PracticeSession, QuestionInstance } from "../domain/types";
 import { toTimeLabel } from "../content/g1g2/helpers";
-import { buildContestQuestions, createPracticeProvider, allGrade12Skills } from "../content/g1g2/bank";
-import { buildLegacyContestQuestions, totalQuestionsForGrade } from "../legacy/grade3plus";
+import {
+  allBandSkills,
+  buildContestQuestionsForGrade,
+  createPracticeProviderForGrade,
+  questionCountForGrade
+} from "../content/bands/index";
 import { getDeterministicCoach } from "../coach/deterministicCoach";
 import { TTSQueue } from "../audio/ttsQueue";
 import { loadProfile, loadProfileAsync, saveProfileAsync } from "../storage/profileStore";
@@ -9,6 +13,7 @@ import { buildConceptLab, type ConceptLabFlow } from "../learn/conceptLab";
 import {
   getGuidedTopic,
   listGuidedTopics,
+  type GuidedControl,
   type GuidedStage,
   type GuidedTopic,
   type GuidedTopicId
@@ -104,6 +109,7 @@ const state: {
   guidedFeedback: string;
   guidedFeedbackTone: "good" | "retry" | "";
   guidedSelectedIndex: number | null;
+  guidedControlKey: string | null;
   answerLayoutMode: AnswerLayoutMode;
   learnAnswerLayoutMode: AnswerLayoutMode;
   scrollRailState: ScrollRailState;
@@ -145,6 +151,7 @@ const state: {
   guidedFeedback: "",
   guidedFeedbackTone: "",
   guidedSelectedIndex: null,
+  guidedControlKey: null,
   answerLayoutMode: "grid",
   learnAnswerLayoutMode: "grid",
   scrollRailState: {
@@ -188,10 +195,21 @@ function defaultScrollTargetForScreen(screenId: ScreenId): HTMLElement | null {
 
 function syncViewportMetrics(): void {
   const viewport = window.visualViewport;
-  const width = Math.max(180, Math.floor(Math.min(240, viewport?.width ?? window.innerWidth ?? 240)));
-  const height = Math.max(220, Math.floor(Math.min(282, viewport?.height ?? window.innerHeight ?? 282)));
+  const layoutWidth = window.innerWidth || 240;
+  const layoutHeight = window.innerHeight || 282;
+  const width = Math.max(180, Math.floor(Math.min(240, viewport?.width ?? layoutWidth)));
+  const height = Math.max(220, Math.floor(Math.min(282, viewport?.height ?? layoutHeight)));
+  const topInset = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
+  const bottomInset = Math.max(0, Math.round(layoutHeight - ((viewport?.offsetTop ?? 0) + (viewport?.height ?? layoutHeight))));
+  const sideInset = Math.max(
+    0,
+    Math.round((((layoutWidth - (viewport?.width ?? layoutWidth)) / 2) + (viewport?.offsetLeft ?? 0)))
+  );
   document.documentElement.style.setProperty("--viewport-width", `${width}px`);
   document.documentElement.style.setProperty("--viewport-height", `${height}px`);
+  document.body.style.setProperty("--safe-top", `${Math.max(height < 270 ? 5 : 6, topInset)}px`);
+  document.body.style.setProperty("--safe-bottom", `${Math.max(height < 270 ? 3 : 4, bottomInset)}px`);
+  document.body.style.setProperty("--safe-side", `${Math.max(4, sideInset)}px`);
   document.body.dataset.compactHeight = height < 270 ? "true" : "false";
 }
 
@@ -399,12 +417,12 @@ function setMode(mode: GameMode): void {
 }
 
 function updateModeInfo(): void {
-  const total = totalQuestionsForGrade(state.grade);
+  const total = questionCountForGrade(state.grade);
   let info = "";
   if (state.mode === "contest") {
     info = `Contest · ${state.grade <= 4 ? 24 : 30} Q · 75 min · 3/4/5 points`;
   } else if (state.mode === "learn") {
-    info = state.grade <= 2 ? "Learn · Topic lessons · Interactive visuals + checks" : `Learn · ${total} Q · Concept lab + checks + transfer`;
+    info = "Learn · Topic lessons · Interactive visuals + checks + transfer";
   } else {
     info = `Practice · ${total} Q · Adaptive + fix-the-miss drills`;
   }
@@ -457,7 +475,7 @@ function hideLearnPanel(): void {
 }
 
 function isGuidedLearnMode(): boolean {
-  return state.mode === "learn" && state.grade <= 2;
+  return state.mode === "learn";
 }
 
 function currentGuidedTopic(): GuidedTopic | null {
@@ -471,6 +489,63 @@ function currentGuidedStage(): GuidedStage | null {
   return topic.stages[state.guidedStepIndex] || null;
 }
 
+function currentGuidedControls(): GuidedControl[] {
+  return currentGuidedStage()?.controls || [];
+}
+
+function formatGuidedControlValue(control: GuidedControl, value: number | string): string {
+  if (control.kind === "range" && control.formatter) {
+    return control.formatter(value);
+  }
+  return String(value);
+}
+
+function syncGuidedControlSelection(controls: GuidedControl[]): void {
+  if (!controls.length) {
+    state.guidedControlKey = null;
+    return;
+  }
+  if (!state.guidedControlKey || !controls.some((control) => control.key === state.guidedControlKey)) {
+    state.guidedControlKey = controls[0]?.key || null;
+  }
+}
+
+function setGuidedControlKey(key: string): void {
+  state.guidedControlKey = key;
+  renderGuidedStage();
+}
+
+function isGuidedControlTuningAvailable(): boolean {
+  if (!currentGuidedTopic()) return false;
+  if (qs<HTMLElement>("#coach-overlay").classList.contains("active")) return false;
+  const card = qs<HTMLElement>("#game-screen .question-card");
+  return card.scrollHeight <= card.clientHeight + 2;
+}
+
+function adjustGuidedControlFromWheel(direction: 1 | -1): boolean {
+  if (!isGuidedControlTuningAvailable()) return false;
+  const controls = currentGuidedControls();
+  syncGuidedControlSelection(controls);
+  const active = controls.find((control) => control.key === state.guidedControlKey);
+  if (!active) return false;
+
+  if (active.kind === "range") {
+    const current = Number(state.guidedValues[active.key] ?? active.min);
+    const next = Math.max(active.min, Math.min(active.max, current + direction * (active.step || 1)));
+    if (next !== current) setGuidedValue(active.key, next, false);
+    return true;
+  }
+
+  const options = active.options;
+  const currentIndex = Math.max(0, options.findIndex((option) => option.value === state.guidedValues[active.key]));
+  const nextIndex = Math.max(0, Math.min(options.length - 1, currentIndex + direction));
+  const nextValue = options[nextIndex]?.value;
+  if (nextValue !== undefined && nextValue !== state.guidedValues[active.key]) {
+    setGuidedValue(active.key, nextValue, false);
+  }
+  return true;
+}
+
 function resetGuidedState(): void {
   state.guidedTopicId = null;
   state.guidedStepIndex = 0;
@@ -480,6 +555,7 @@ function resetGuidedState(): void {
   state.guidedFeedback = "";
   state.guidedFeedbackTone = "";
   state.guidedSelectedIndex = null;
+  state.guidedControlKey = null;
 }
 
 function hideGuidedLessons(): void {
@@ -487,6 +563,9 @@ function hideGuidedLessons(): void {
   qs<HTMLElement>("#topic-browser").hidden = true;
   qs<HTMLElement>("#guided-panel").hidden = true;
   qs<HTMLElement>("#guided-visual").innerHTML = "";
+  qs<HTMLElement>("#guided-controls").hidden = true;
+  qs<HTMLElement>("#guided-param-strip").innerHTML = "";
+  qs<HTMLElement>("#guided-control-deck").innerHTML = "";
   const options = qs<HTMLElement>("#guided-choice-options");
   options.innerHTML = "";
   options.hidden = true;
@@ -538,12 +617,20 @@ function updateHudForGuidedLearn(browser = false): void {
   );
 }
 
-function setGuidedValue(key: string, value: number | string): void {
+function setGuidedValue(key: string, value: number | string, resetSelection = true): void {
   state.guidedValues = { ...state.guidedValues, [key]: value };
+  state.guidedControlKey = key;
 
   if ("parts" in state.guidedValues && "shaded" in state.guidedValues) {
-    const maxShaded = Math.max(1, Math.min(Number(state.guidedValues.parts), 2));
+    const maxShaded = Math.max(1, Number(state.guidedValues.parts));
     state.guidedValues.shaded = Math.max(1, Math.min(Number(state.guidedValues.shaded), maxShaded));
+  }
+  if (resetSelection) {
+    state.guidedSelectedIndex = null;
+    state.guidedFeedback = "";
+    state.guidedFeedbackTone = "";
+    state.guidedStepAttempts = 0;
+    state.guidedStepResolved = !(currentGuidedStage()?.prompt && currentGuidedStage()?.options && currentGuidedStage()?.correctIndex);
   }
 
   renderGuidedStage();
@@ -572,7 +659,7 @@ function renderGuidedTopicBrowser(): void {
   const topics = listGuidedTopics(state.grade);
   browser.innerHTML = `
     <div class="topic-browser-intro">
-      Pick one concept. Move the sliders, watch the picture change, answer a quick check, then move to the next step.
+      Pick one concept. Tap a parameter chip, tune one thing at a time, watch the picture change, then solve the quick check.
     </div>
   `;
 
@@ -628,50 +715,93 @@ function renderGuidedStage(): void {
   guidedVisual.hidden = false;
 
   const controls = qs<HTMLElement>("#guided-controls");
-  controls.innerHTML = "";
-  (stage.controls || []).forEach((control) => {
-    const wrap = document.createElement("div");
-    wrap.className = "guided-control";
+  const stageControls = stage.controls || [];
+  const paramStrip = qs<HTMLElement>("#guided-param-strip");
+  const controlDeck = qs<HTMLElement>("#guided-control-deck");
+  paramStrip.innerHTML = "";
+  controlDeck.innerHTML = "";
+  syncGuidedControlSelection(stageControls);
 
-    if (control.kind === "range") {
-      const current = Number(state.guidedValues[control.key] ?? control.min);
-      wrap.innerHTML = `
-        <div class="guided-control-top">
-          <span class="guided-control-label">${control.label}</span>
-          <span class="guided-control-value">${control.formatter ? control.formatter(current) : current}</span>
-        </div>
+  if (stageControls.length) {
+    controls.hidden = false;
+    stageControls.forEach((control) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "guided-param-chip";
+      chip.classList.toggle("active", control.key === state.guidedControlKey);
+      chip.innerHTML = `
+        <span class="guided-param-name">${control.label}</span>
+        <span class="guided-param-value">${formatGuidedControlValue(control, state.guidedValues[control.key] ?? (control.kind === "range" ? control.min : control.options[0]?.value ?? ""))}</span>
       `;
-      const input = document.createElement("input");
-      input.className = "guided-control-range";
-      input.type = "range";
-      input.min = String(control.min);
-      input.max = String(control.max);
-      input.step = String(control.step || 1);
-      input.value = String(current);
-      input.addEventListener("input", () => setGuidedValue(control.key, Number(input.value)));
-      wrap.appendChild(input);
-    } else {
-      wrap.innerHTML = `
-        <div class="guided-control-top">
-          <span class="guided-control-label">${control.label}</span>
-        </div>
+      chip.addEventListener("click", () => setGuidedControlKey(control.key));
+      paramStrip.appendChild(chip);
+    });
+
+    const activeControl = stageControls.find((control) => control.key === state.guidedControlKey) || stageControls[0];
+    if (activeControl) {
+      const currentValue = state.guidedValues[activeControl.key] ?? (activeControl.kind === "range" ? activeControl.min : activeControl.options[0]?.value ?? "");
+      const top = document.createElement("div");
+      top.className = "guided-control-top";
+      top.innerHTML = `
+        <span class="guided-control-label">${activeControl.label}</span>
+        <span class="guided-control-value">${formatGuidedControlValue(activeControl, currentValue)}</span>
       `;
-      const row = document.createElement("div");
-      row.className = "guided-toggle-row";
-      control.options.forEach((option) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "guided-toggle-btn";
-        button.textContent = option.label;
-        button.classList.toggle("active", state.guidedValues[control.key] === option.value);
-        button.addEventListener("click", () => setGuidedValue(control.key, option.value));
-        row.appendChild(button);
-      });
-      wrap.appendChild(row);
+      controlDeck.appendChild(top);
+
+      const hint = document.createElement("div");
+      hint.className = "guided-control-hint";
+      hint.textContent =
+        activeControl.kind === "range"
+          ? "Tap + / - or use the wheel when the card is still."
+          : "Pick the version you want to compare.";
+      controlDeck.appendChild(hint);
+
+      if (activeControl.kind === "range") {
+        const current = Number(currentValue);
+        const row = document.createElement("div");
+        row.className = "guided-control-range-row";
+
+        const minus = document.createElement("button");
+        minus.type = "button";
+        minus.className = "guided-control-step";
+        minus.textContent = "−";
+        minus.addEventListener("click", () => setGuidedValue(activeControl.key, Math.max(activeControl.min, current - (activeControl.step || 1))));
+
+        const input = document.createElement("input");
+        input.className = "guided-control-range";
+        input.type = "range";
+        input.min = String(activeControl.min);
+        input.max = String(activeControl.max);
+        input.step = String(activeControl.step || 1);
+        input.value = String(current);
+        input.addEventListener("input", () => setGuidedValue(activeControl.key, Number(input.value)));
+
+        const plus = document.createElement("button");
+        plus.type = "button";
+        plus.className = "guided-control-step";
+        plus.textContent = "+";
+        plus.addEventListener("click", () => setGuidedValue(activeControl.key, Math.min(activeControl.max, current + (activeControl.step || 1))));
+
+        row.append(minus, input, plus);
+        controlDeck.appendChild(row);
+      } else {
+        const row = document.createElement("div");
+        row.className = "guided-toggle-row";
+        activeControl.options.forEach((option) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "guided-toggle-btn";
+          button.textContent = option.label;
+          button.classList.toggle("active", state.guidedValues[activeControl.key] === option.value);
+          button.addEventListener("click", () => setGuidedValue(activeControl.key, option.value));
+          row.appendChild(button);
+        });
+        controlDeck.appendChild(row);
+      }
     }
-
-    controls.appendChild(wrap);
-  });
+  } else {
+    controls.hidden = true;
+  }
 
   const prompt = qs<HTMLElement>("#guided-choice-prompt");
   const options = qs<HTMLElement>("#guided-choice-options");
@@ -736,6 +866,7 @@ function startGuidedTopic(topicId: GuidedTopicId): void {
   state.guidedFeedback = "";
   state.guidedFeedbackTone = "";
   state.guidedSelectedIndex = null;
+  state.guidedControlKey = null;
   renderGuidedStage();
 }
 
@@ -782,6 +913,7 @@ function advanceGuidedStage(): void {
   state.guidedFeedback = "";
   state.guidedFeedbackTone = "";
   state.guidedSelectedIndex = null;
+  state.guidedControlKey = null;
   renderGuidedStage();
 }
 
@@ -1354,7 +1486,6 @@ function next(): void {
   clearLearnTimer();
   if (
     (state.mode === "practice" || state.mode === "learn") &&
-    state.grade <= 2 &&
     state.practiceSession &&
     state.index + 1 < state.practiceSession.total &&
     state.questions.length <= state.index + 1
@@ -1411,43 +1542,33 @@ function onAnswer(index: number, button: HTMLButtonElement): void {
 }
 
 function prepareQuestions(): void {
-  if (state.grade <= 2) {
-    if (state.mode === "contest") {
-      state.questions = buildContestQuestions(state.grade);
-      state.stageLabel = "Contest";
-      state.practiceSession = null;
-      return;
-    }
-
-    if (state.mode === "learn") {
-      state.questions = [];
-      state.stageLabel = "Learn";
-      state.practiceSession = null;
-      return;
-    }
-
-    const provider = createPracticeProvider(state.grade as 1 | 2);
-    setPracticeQuestionProvider({
-      pickAny: (grade, avoidHashes, pointTier) => provider.pickAny(avoidHashes, pointTier),
-      pickBySkill: (grade, skillId, avoidHashes, pointTier) => provider.pickBySkill(skillId, avoidHashes, pointTier),
-      pickByFamily: (grade, skillId, familyId, avoidHashes, pointTier) =>
-        provider.pickByFamily(skillId, familyId, avoidHashes, pointTier),
-      allSkills: (grade) => allGrade12Skills(grade),
-      allFamilies: (grade, skillId) => provider.allFamilies(skillId)
-    });
-
-    state.practiceSession = startPracticeSession(state.profile, state.grade as 1 | 2);
-    state.stageLabel =
-      state.mode === "learn"
-        ? `Learn ${state.practiceSession.stage}`
-        : `Practice ${state.practiceSession.stage}`;
-    state.questions = [nextQuestion(state.practiceSession, state.profile)];
+  if (state.mode === "contest") {
+    state.questions = buildContestQuestionsForGrade(state.grade);
+    state.stageLabel = "Contest";
+    state.practiceSession = null;
     return;
   }
 
-  state.questions = buildLegacyContestQuestions(state.grade);
-  state.stageLabel = state.mode === "contest" ? "Contest" : state.mode === "learn" ? "Learn" : "Practice";
-  state.practiceSession = null;
+  if (state.mode === "learn") {
+    state.questions = [];
+    state.stageLabel = "Learn";
+    state.practiceSession = null;
+    return;
+  }
+
+  const provider = createPracticeProviderForGrade(state.grade);
+  setPracticeQuestionProvider({
+    pickAny: (grade, avoidHashes, pointTier) => provider.pickAny(avoidHashes, pointTier),
+    pickBySkill: (grade, skillId, avoidHashes, pointTier) => provider.pickBySkill(skillId, avoidHashes, pointTier),
+    pickByFamily: (grade, skillId, familyId, avoidHashes, pointTier) =>
+      provider.pickByFamily(skillId, familyId, avoidHashes, pointTier),
+    allSkills: (grade) => allBandSkills(grade),
+    allFamilies: (grade, skillId) => provider.allFamilies(skillId)
+  });
+
+  state.practiceSession = startPracticeSession(state.profile, state.grade);
+  state.stageLabel = `Practice ${state.practiceSession.stage}`;
+  state.questions = [nextQuestion(state.practiceSession, state.profile)];
 }
 
 function startGame(): void {
@@ -1571,6 +1692,7 @@ function renderAppToText(): string {
     learnActive: state.learnActive,
     guidedTopic: currentGuidedTopic()?.title || "",
     guidedStep: currentGuidedStage()?.title || "",
+    guidedControl: state.guidedControlKey || "",
     learnStep: currentLearnStep()?.title || "",
     learnPrompt: currentLearnStep()?.prompt || "",
     answerLayoutMode: state.answerLayoutMode,
@@ -1581,7 +1703,9 @@ function renderAppToText(): string {
     clientHeight: scrollTarget?.clientHeight ?? 0,
     railVisible: state.scrollRailState.visible,
     railThumbTop: state.scrollRailState.thumbTop,
-    railThumbHeight: state.scrollRailState.thumbHeight
+    railThumbHeight: state.scrollRailState.thumbHeight,
+    viewportWidth: document.documentElement.style.getPropertyValue("--viewport-width"),
+    viewportHeight: document.documentElement.style.getPropertyValue("--viewport-height")
   });
 }
 
@@ -1643,8 +1767,10 @@ function wireUi(): void {
 
   window.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "PageDown") {
+      if (adjustGuidedControlFromWheel(1)) return;
       scrollActiveScreen(SCROLL_STEP);
     } else if (event.key === "ArrowUp" || event.key === "PageUp") {
+      if (adjustGuidedControlFromWheel(-1)) return;
       scrollActiveScreen(-SCROLL_STEP);
     }
   });
@@ -1653,20 +1779,27 @@ function wireUi(): void {
     "wheel",
     (event) => {
       if (Math.abs(event.deltaY) < 2) return;
+      if (adjustGuidedControlFromWheel(event.deltaY > 0 ? 1 : -1)) return;
       scrollActiveScreen(event.deltaY > 0 ? SCROLL_STEP : -SCROLL_STEP);
     },
     { passive: true }
   );
 
   // Rabbit r1 hardware events used in official plugin-demo.
-  window.addEventListener("scrollDown", () => scrollActiveScreen(SCROLL_STEP));
-  window.addEventListener("scrollUp", () => scrollActiveScreen(-SCROLL_STEP));
+  window.addEventListener("scrollDown", () => {
+    if (adjustGuidedControlFromWheel(1)) return;
+    scrollActiveScreen(SCROLL_STEP);
+  });
+  window.addEventListener("scrollUp", () => {
+    if (adjustGuidedControlFromWheel(-1)) return;
+    scrollActiveScreen(-SCROLL_STEP);
+  });
   window.addEventListener("sideClick", () => {
     if (isGuidedLearnMode() && document.querySelector<HTMLElement>("#game-screen.active")) {
       if (currentGuidedTopic()) {
         speakCurrentGuidedStage();
       } else {
-        speakCoach("Pick a topic. Move a slider, watch the picture change, then solve the quick check.");
+        speakCoach("Pick a topic. Tap a parameter chip, tune one thing at a time, then solve the quick check.");
       }
       return;
     }

@@ -1,0 +1,8 @@
+{
+  "bandId": "g12",
+  "grades": [1, 2],
+  "targetTemplates": 360,
+  "contestQuestions": 24,
+  "pointDistribution": { "3": 0.4, "4": 0.35, "5": 0.25 },
+  "source": "../../g1g2/coverage-map.json"
+}

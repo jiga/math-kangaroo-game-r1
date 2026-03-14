@@ -148,6 +148,21 @@ const SKILL_COACH: Record<SkillId, CoachPack> = {
   }
 };
 
+function humanizeSkill(skillId: SkillId): string {
+  return skillId.replaceAll("_", " ");
+}
+
+function genericCoach(question: QuestionInstance): CoachPack {
+  const lead = question.strategyTags[0] || "spot the rule";
+  const next = question.strategyTags[1] || "check one small step";
+  return {
+    hint: `Start with ${lead}. Name the target before you calculate.`,
+    errorDiagnosis: question.trapWarning || `Common miss in ${humanizeSkill(question.skillId)}: rushing before the structure is clear.`,
+    speedTactic: `Use ${lead}, then ${next}. Cross out impossible choices before doing extra work.`,
+    miniExample: question.explanation.length <= 160 ? question.explanation : `Example move: ${lead}, then ${next}.`
+  };
+}
+
 const FAMILY_OVERRIDES: Partial<Record<string, Partial<CoachPack>>> = {
   exclusion_shelf: {
     hint: "Cross out every choice that contains a forbidden object.",
@@ -262,7 +277,7 @@ const FAMILY_OVERRIDES: Partial<Record<string, Partial<CoachPack>>> = {
 };
 
 export function getDeterministicCoach(question: QuestionInstance, correct: boolean): CoachPack {
-  const base = SKILL_COACH[question.skillId] || DEFAULT_COACH;
+  const base = SKILL_COACH[question.skillId] || genericCoach(question) || DEFAULT_COACH;
   const family = FAMILY_OVERRIDES[question.familyId] || {};
   const strategyLine = question.strategyTags.length
     ? `Use this move: ${question.strategyTags.slice(0, 2).join(", ")}.`

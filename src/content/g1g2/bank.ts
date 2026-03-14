@@ -149,6 +149,7 @@ function instantiate(template: QuestionTemplate, seed: number, tierOverride?: Po
   return template.generate({
     templateId: template.id,
     grade: template.grade,
+    bandId: template.bandId,
     pointTier: tierOverride || template.pointTier,
     variantSeed: seed
   });

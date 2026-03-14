@@ -1,9 +1,9 @@
 :root {
   --viewport-width: 240px;
   --viewport-height: 282px;
-  --safe-top: 10px;
-  --safe-bottom: 5px;
-  --safe-side: 6px;
+  --safe-top: 6px;
+  --safe-bottom: 3px;
+  --safe-side: 4px;
   --bg: #050b18;
   --card: #07142a;
   --text: #f2f7ff;
@@ -212,7 +212,7 @@ h2 {
 }
 
 .question-card[data-overflowing="true"] {
-  padding-right: 16px;
+  padding-right: 13px;
 }
 
 .hud-bar {
@@ -306,7 +306,7 @@ h2 {
 .guided-panel {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .topic-browser-intro {
@@ -348,7 +348,7 @@ h2 {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 4px;
+  gap: 3px;
 }
 
 .guided-headings {
@@ -359,9 +359,10 @@ h2 {
 }
 
 .guided-topic-title {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 900;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
+  line-height: 1.05;
 }
 
 .guided-step-index {
@@ -378,23 +379,23 @@ h2 {
 }
 
 .guided-step-title {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.4px;
 }
 
 .guided-derivation {
   border-radius: 9px;
-  padding: 3px 5px;
+  padding: 2px 5px;
   background: color-mix(in srgb, var(--option-bg) 78%, #fff 22%);
-  font-size: 7px;
-  line-height: 1.2;
+  font-size: 6px;
+  line-height: 1.15;
   color: var(--accent);
 }
 
 .guided-visual {
-  height: 78px;
-  min-height: 78px;
+  height: 90px;
+  min-height: 90px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent 30%);
   background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, transparent 82%), transparent 56%);
@@ -413,60 +414,139 @@ h2 {
 }
 
 .guided-step-body {
-  font-size: 7px;
-  line-height: 1.25;
+  font-size: 6px;
+  line-height: 1.2;
 }
 
 .guided-controls {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent 28%);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--option-bg) 88%, #fff 12%);
 }
 
-.guided-control {
+.guided-param-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.guided-param-chip {
+  min-height: 24px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent 22%);
+  background: color-mix(in srgb, var(--option-bg) 88%, #fff 12%);
+  color: var(--text);
+  padding: 3px 5px;
+  text-align: left;
+}
+
+.guided-param-chip.active {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent2) 30%, transparent 70%);
+}
+
+.guided-param-name,
+.guided-param-value,
+.guided-control-label,
+.guided-control-value,
+.guided-control-hint {
+  display: block;
+}
+
+.guided-param-name {
+  font-size: 6px;
+  line-height: 1.05;
+  color: var(--muted);
+  font-weight: 800;
+  letter-spacing: 0.25px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guided-param-value {
+  margin-top: 1px;
+  font-size: 8px;
+  line-height: 1.1;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guided-control-deck {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .guided-control-top {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 6px;
-  font-size: 7px;
-  color: var(--muted);
+  gap: 8px;
 }
 
 .guided-control-label {
+  font-size: 7px;
+  color: var(--muted);
   font-weight: 800;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.25px;
 }
 
 .guided-control-value {
+  font-size: 9px;
   color: var(--text);
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.guided-control-hint {
+  font-size: 6px;
+  color: var(--muted);
+  line-height: 1.15;
+}
+
+.guided-control-range-row,
+.guided-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.guided-control-step {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--option-bg) 84%, #fff 16%);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .guided-control-range {
+  flex: 1;
   width: 100%;
   accent-color: var(--accent);
 }
 
-.guided-toggle-row {
-  display: flex;
-  gap: 4px;
-}
-
 .guided-toggle-btn {
   flex: 1;
-  min-height: 22px;
+  min-height: 24px;
   border-radius: 10px;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--option-bg) 88%, #fff 12%);
   color: var(--text);
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 800;
+  padding: 0 4px;
 }
 
 .guided-toggle-btn.active {
@@ -475,7 +555,7 @@ h2 {
 }
 
 .guided-choice-prompt {
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 900;
   line-height: 1.2;
 }
@@ -555,7 +635,7 @@ h2 {
 .guided-actions .btn {
   width: 100%;
   min-height: 24px;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .learn-panel {
@@ -849,10 +929,10 @@ h2 {
 
 .scroll-rail {
   position: absolute;
-  top: 26px;
-  right: 4px;
+  top: 24px;
+  right: 2px;
   bottom: 4px;
-  width: 10px;
+  width: 9px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -865,13 +945,13 @@ h2 {
 
 .scroll-rail-step {
   width: 100%;
-  min-height: 16px;
+  min-height: 14px;
   border: 1px solid color-mix(in srgb, var(--line) 78%, transparent 22%);
   border-radius: 999px;
   background: color-mix(in srgb, var(--option-bg) 78%, #fff 22%);
   color: var(--muted);
   padding: 0;
-  font-size: 7px;
+  font-size: 8px;
   line-height: 1;
 }
 
@@ -999,8 +1079,8 @@ h2 {
 }
 
 body[data-compact-height="true"] {
-  --safe-top: 8px;
-  --safe-bottom: 4px;
+  --safe-top: 5px;
+  --safe-bottom: 3px;
 }
 
 body[data-compact-height="true"] h1 {
@@ -1051,6 +1131,34 @@ body[data-compact-height="true"] .learn-visual {
 body[data-compact-height="true"] .coach-visual {
   min-height: 52px;
   max-height: 82px;
+}
+
+body[data-compact-height="true"] .guided-topic-title {
+  font-size: 7px;
+}
+
+body[data-compact-height="true"] .guided-step-title {
+  font-size: 8px;
+}
+
+body[data-compact-height="true"] .guided-visual {
+  min-height: 84px;
+  height: 84px;
+}
+
+body[data-compact-height="true"] .guided-controls {
+  padding: 3px;
+}
+
+body[data-compact-height="true"] .guided-param-chip {
+  min-height: 22px;
+}
+
+body[data-compact-height="true"] .guided-control-step {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
 }
 
 body[data-compact-height="true"] .question-visual[data-kind="broken_line"] svg,

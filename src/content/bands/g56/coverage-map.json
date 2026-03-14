@@ -1,0 +1,21 @@
+{
+  "bandId": "g56",
+  "grades": [5, 6],
+  "targetTemplates": 320,
+  "contestQuestions": 30,
+  "pointDistribution": { "3": 0.4, "4": 0.35, "5": 0.25 },
+  "curriculum": [
+    { "skillId": "factors_multiples_primes", "title": "Factors, Multiples, and Primes", "domain": "number", "lessonTopic": "number_theory", "summary": "Prime tests, common multiples, and factor structure.", "requiredTemplates": 27, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "fractions_operations", "title": "Fraction Operations", "domain": "fractions", "lessonTopic": "fractions_ratios", "summary": "Add, subtract, compare, and scale fractions.", "requiredTemplates": 27, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "decimals_percents", "title": "Decimals and Percents", "domain": "number", "lessonTopic": "fractions_ratios", "summary": "Convert, compare, and use percent as per hundred.", "requiredTemplates": 27, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "ratio_rate", "title": "Ratio and Rate", "domain": "proportional", "lessonTopic": "fractions_ratios", "summary": "Scale recipes, unit rates, and ratio tables.", "requiredTemplates": 27, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "expressions_equations", "title": "Expressions and Equations", "domain": "algebra", "lessonTopic": "algebra_patterns", "summary": "Use variables, balance equations, and simplify expressions.", "requiredTemplates": 27, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "area_volume", "title": "Area and Volume", "domain": "geometry", "lessonTopic": "geometry_measurement", "summary": "Composite area, rectangle volume, and surface patterns.", "requiredTemplates": 27, "requiredFamilies": 4, "highValue": true },
+    { "skillId": "angles_geometry", "title": "Angles and Geometry", "domain": "geometry", "lessonTopic": "geometry_measurement", "summary": "Angle sums, polygons, and triangle properties.", "requiredTemplates": 27, "requiredFamilies": 4 },
+    { "skillId": "divisibility_remainders", "title": "Divisibility and Remainders", "domain": "number", "lessonTopic": "number_theory", "summary": "Divisibility tests, quotient-remainder, and packing logic.", "requiredTemplates": 26, "requiredFamilies": 4 },
+    { "skillId": "coordinates_graphs", "title": "Coordinates and Graphs", "domain": "data", "lessonTopic": "graphs_probability", "summary": "Coordinate reading, graph trends, and table interpretation.", "requiredTemplates": 26, "requiredFamilies": 4 },
+    { "skillId": "probability_counting", "title": "Probability and Counting", "domain": "logic", "lessonTopic": "graphs_probability", "summary": "Count outcomes, compare probabilities, and reason from constraints.", "requiredTemplates": 26, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "sequences_patterns", "title": "Sequences and Patterns", "domain": "algebra", "lessonTopic": "algebra_patterns", "summary": "Growing patterns, recursive rules, and arithmetic sequences.", "requiredTemplates": 26, "requiredFamilies": 4 },
+    { "skillId": "logic_sets", "title": "Logic, Sets, and Strategy", "domain": "logic", "lessonTopic": "exam_labs", "summary": "Set membership, elimination, parity, and invariant-style ideas.", "requiredTemplates": 27, "requiredFamilies": 5, "highValue": true }
+  ]
+}

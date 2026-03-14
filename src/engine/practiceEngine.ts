@@ -1,17 +1,18 @@
-import type { PracticeProfile, PracticeSession, SkillId, QuestionInstance, SkillProgress } from "../domain/types";
+import type { Grade, PracticeProfile, PracticeSession, SkillId, QuestionInstance, SkillProgress } from "../domain/types";
+import { gradeToBand, questionCountForGrade } from "../content/bands/common";
 
 export interface PracticeQuestionProvider {
-  pickAny: (grade: 1 | 2, avoidHashes: Set<string>, pointTier: 3 | 4 | 5) => QuestionInstance;
-  pickBySkill: (grade: 1 | 2, skillId: SkillId, avoidHashes: Set<string>, pointTier: 3 | 4 | 5) => QuestionInstance;
+  pickAny: (grade: Grade, avoidHashes: Set<string>, pointTier: 3 | 4 | 5) => QuestionInstance;
+  pickBySkill: (grade: Grade, skillId: SkillId, avoidHashes: Set<string>, pointTier: 3 | 4 | 5) => QuestionInstance;
   pickByFamily: (
-    grade: 1 | 2,
+    grade: Grade,
     skillId: SkillId,
     familyId: string,
     avoidHashes: Set<string>,
     pointTier: 3 | 4 | 5
   ) => QuestionInstance;
-  allSkills: (grade: 1 | 2) => SkillId[];
-  allFamilies: (grade: 1 | 2, skillId: SkillId) => string[];
+  allSkills: (grade: Grade) => SkillId[];
+  allFamilies: (grade: Grade, skillId: SkillId) => string[];
 }
 
 let provider: PracticeQuestionProvider | null = null;
@@ -20,21 +21,22 @@ export function setPracticeQuestionProvider(nextProvider: PracticeQuestionProvid
   provider = nextProvider;
 }
 
-function sessionStage(profile: PracticeProfile, grade: 1 | 2): "diagnostic" | "mastery" | "mock" {
+function sessionStage(profile: PracticeProfile, grade: Grade): "diagnostic" | "mastery" | "mock" {
   const sessions = profile.gradeStats[String(grade)]?.sessions || 0;
   if (sessions < 2) return "diagnostic";
   if ((sessions + 1) % 4 === 0) return "mock";
   return "mastery";
 }
 
-export function startPracticeSession(profile: PracticeProfile, grade: 1 | 2): PracticeSession {
+export function startPracticeSession(profile: PracticeProfile, grade: Grade): PracticeSession {
   const stage = sessionStage(profile, grade);
   return {
     id: `practice_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
     grade,
+    bandId: gradeToBand(grade),
     stage,
     index: 0,
-    total: stage === "mock" ? 24 : 24,
+    total: questionCountForGrade(grade),
     startedAt: Date.now(),
     missesBySkill: {},
     missesByFamily: {},
@@ -90,27 +92,33 @@ function dueForFamilyReview(profile: PracticeProfile, skillId: SkillId, familyId
 }
 
 function contestWeight(skillId: SkillId): number {
-  const highValue: SkillId[] = [
-    "maze_shape_puzzles",
-    "venn_diagrams_easy",
-    "cube_cuboid_visualization",
-    "perimeter_broken_lines",
-    "prealgebra_balance"
+  const highValueNeedles = [
+    "logic",
+    "count",
+    "probability",
+    "geometry",
+    "net",
+    "modular",
+    "quadratic",
+    "system",
+    "ratio"
   ];
-  return highValue.includes(skillId) ? 0.35 : 0.15;
+  return highValueNeedles.some((needle) => skillId.includes(needle)) ? 0.35 : 0.15;
 }
 
 function recentMissBoost(session: PracticeSession, skillId: SkillId): number {
-  return Math.min(0.6, (session.missesBySkill[skillId] || 0) * 0.2);
+  return Math.min(1, (session.missesBySkill[skillId] || 0) * 0.45);
 }
 
 function recentFamilyMissBoost(session: PracticeSession, key: string): number {
-  return Math.min(0.6, (session.missesByFamily[key] || 0) * 0.2);
+  return Math.min(1, (session.missesByFamily[key] || 0) * 0.45);
 }
 
-function selectMasterySkill(profile: PracticeProfile, session: PracticeSession, grade: 1 | 2): SkillId {
+function selectMasterySkill(profile: PracticeProfile, session: PracticeSession, grade: Grade): SkillId {
   if (!provider) throw new Error("Practice provider not configured");
   const skills = provider.allSkills(grade);
+  const lastMiss = [...session.answered].reverse().find((entry) => !entry.correct);
+  if (lastMiss && !session.answered.slice(-1)[0]?.correct) return lastMiss.skillId;
   const recentSkills = session.answered.slice(-2).map((entry) => entry.skillId);
   let best = skills[0];
   let bestScore = -Infinity;
@@ -122,10 +130,7 @@ function selectMasterySkill(profile: PracticeProfile, session: PracticeSession, 
       dueForSkillReview(profile, skill) +
       recentMissBoost(session, skill);
 
-    if (recentSkills.includes(skill)) {
-      score -= 0.25;
-    }
-
+    if (recentSkills.includes(skill)) score -= 0.25;
     if (score > bestScore) {
       bestScore = score;
       best = skill;
@@ -134,12 +139,7 @@ function selectMasterySkill(profile: PracticeProfile, session: PracticeSession, 
   return best;
 }
 
-function selectMasteryFamily(
-  profile: PracticeProfile,
-  session: PracticeSession,
-  grade: 1 | 2,
-  skillId: SkillId
-): string {
+function selectMasteryFamily(profile: PracticeProfile, session: PracticeSession, grade: Grade, skillId: SkillId): string {
   if (!provider) throw new Error("Practice provider not configured");
   const families = provider.allFamilies(grade, skillId);
   const recentFamilies = session.answered.slice(-3).map((entry) => entry.familyKey);
@@ -153,10 +153,7 @@ function selectMasteryFamily(
       dueForFamilyReview(profile, skillId, familyId) +
       recentFamilyMissBoost(session, key);
 
-    if (recentFamilies.includes(key)) {
-      score -= 0.25;
-    }
-
+    if (recentFamilies.includes(key)) score -= 0.25;
     if (score > bestScore) {
       bestScore = score;
       best = familyId;
@@ -227,21 +224,20 @@ export function recordAttempt(
   profile.gradeStats[gradeKey] = gradeStat;
 
   profile.recentQuestionHashes.push(question.variantKey);
-  if (profile.recentQuestionHashes.length > 200) {
-    profile.recentQuestionHashes = profile.recentQuestionHashes.slice(-200);
-  }
+  if (profile.recentQuestionHashes.length > 200) profile.recentQuestionHashes = profile.recentQuestionHashes.slice(-200);
   profile.updatedAt = now;
 }
 
-function tierForIndex(index: number): 3 | 4 | 5 {
-  if (index < 8) return 3;
-  if (index < 16) return 4;
+function tierForIndex(index: number, total: number): 3 | 4 | 5 {
+  const segment = total / 3;
+  if (index < segment) return 3;
+  if (index < segment * 2) return 4;
   return 5;
 }
 
 export function nextQuestion(session: PracticeSession, profile: PracticeProfile): QuestionInstance {
   if (!provider) throw new Error("Practice provider not configured");
-  const pointTier = tierForIndex(session.index);
+  const pointTier = tierForIndex(session.index, session.total);
 
   if (session.stage === "diagnostic") {
     const skills = provider.allSkills(session.grade);

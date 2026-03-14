@@ -1,0 +1,21 @@
+{
+  "bandId": "g1112",
+  "grades": [11, 12],
+  "targetTemplates": 360,
+  "contestQuestions": 30,
+  "pointDistribution": { "3": 0.4, "4": 0.35, "5": 0.25 },
+  "curriculum": [
+    { "skillId": "advanced_algebra", "title": "Advanced Algebra", "domain": "algebra", "lessonTopic": "advanced_algebra", "summary": "Manipulate expressions, identities, and parameterized equations.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "functions_transformations", "title": "Functions and Transformations", "domain": "algebra", "lessonTopic": "functions_analysis", "summary": "Composition, inverse thinking, and graph transformations.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "polynomial_roots", "title": "Polynomials and Roots", "domain": "algebra", "lessonTopic": "advanced_algebra", "summary": "Factor structure, Vieta-style reasoning, and root patterns.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "trig_geometry", "title": "Trigonometric Geometry", "domain": "geometry", "lessonTopic": "geometry_trig", "summary": "Trig ratios, angle relationships, and contest triangles.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "analytic_geometry", "title": "Analytic Geometry", "domain": "geometry", "lessonTopic": "geometry_trig", "summary": "Coordinate methods, distance, midpoint, and slope relations.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "combinatorics_probability", "title": "Combinatorics and Probability", "domain": "logic", "lessonTopic": "counting_probability", "summary": "Permutations, combinations, conditional probability, and strategy.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "sequences_series_upper", "title": "Sequences and Series", "domain": "algebra", "lessonTopic": "functions_analysis", "summary": "Closed forms, recurrences, and telescoping-style ideas.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "inequalities_systems_upper", "title": "Inequalities and Systems", "domain": "algebra", "lessonTopic": "advanced_algebra", "summary": "Inequality logic, interval intersections, and multi-condition systems.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "logarithms_exponents", "title": "Logarithms and Exponents", "domain": "algebra", "lessonTopic": "functions_analysis", "summary": "Growth laws, log manipulation, and exponential equations.", "requiredTemplates": 30, "requiredFamilies": 5 },
+    { "skillId": "modular_number_theory", "title": "Modular Number Theory", "domain": "number", "lessonTopic": "number_theory", "summary": "Remainders, modular classes, divisibility, and parity.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "proof_logic_invariants", "title": "Proof Logic and Invariants", "domain": "logic", "lessonTopic": "exam_labs", "summary": "Invariants, extremal reasoning, contradiction, and elimination.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true },
+    { "skillId": "optimization_modeling", "title": "Optimization and Modeling", "domain": "logic", "lessonTopic": "exam_labs", "summary": "Max/min structure, modeling, and efficient contest decision-making.", "requiredTemplates": 30, "requiredFamilies": 5, "highValue": true }
+  ]
+}

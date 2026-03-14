@@ -108,6 +108,7 @@ function toQuestion(ctx: GenerationContext, skillId: SkillId, familyId: string, 
   return {
     id: `${ctx.templateId}:${ctx.variantSeed}`,
     grade: ctx.grade,
+    bandId: ctx.bandId,
     pointTier: ctx.pointTier,
     skillId,
     familyId,
@@ -1959,6 +1960,7 @@ export function createTemplate(
   return {
     id,
     grade,
+    bandId: "g12",
     skillId,
     familyId,
     pointTier,

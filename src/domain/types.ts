@@ -1,30 +1,8 @@
 export type Grade = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type BandId = "g12" | "g34" | "g56" | "g78" | "g910" | "g1112";
 export type PointTier = 3 | 4 | 5;
 
-export type SkillId =
-  | "counting_ordering"
-  | "compare_number_region"
-  | "ordinal_numbers"
-  | "place_value"
-  | "single_digit_add_sub"
-  | "number_line"
-  | "fractions_words"
-  | "sorting_classifying"
-  | "measurement_small"
-  | "patterns"
-  | "perimeter_broken_lines"
-  | "relative_position"
-  | "shape_properties"
-  | "maze_shape_puzzles"
-  | "cube_cuboid_visualization"
-  | "likelihood_vocabulary"
-  | "pictographs_bar_graphs"
-  | "venn_diagrams_easy"
-  | "calendar"
-  | "money_small"
-  | "clock_full_half"
-  | "symmetry_rotation"
-  | "prealgebra_balance";
+export type SkillId = string;
 
 export type QuestionFormat = "text" | "svg";
 
@@ -36,6 +14,10 @@ export type VisualKind =
   | "symmetry"
   | "broken_line"
   | "region_compare"
+  | "graph"
+  | "formula"
+  | "geometry"
+  | "balance"
   | "lesson";
 
 export interface VisualAssetSpec {
@@ -54,6 +36,7 @@ export interface CoachPack {
 export interface QuestionInstance {
   id: string;
   grade: Grade;
+  bandId: BandId;
   pointTier: PointTier;
   skillId: SkillId;
   familyId: string;
@@ -71,14 +54,16 @@ export interface QuestionInstance {
 
 export interface GenerationContext {
   templateId: string;
-  grade: 1 | 2;
+  grade: Grade;
+  bandId: BandId;
   pointTier: PointTier;
   variantSeed: number;
 }
 
 export interface QuestionTemplate {
   id: string;
-  grade: 1 | 2;
+  grade: Grade;
+  bandId: BandId;
   skillId: SkillId;
   familyId: string;
   pointTier: PointTier;
@@ -108,7 +93,8 @@ export type PracticeStage = "diagnostic" | "mastery" | "mock";
 
 export interface PracticeSession {
   id: string;
-  grade: 1 | 2;
+  grade: Grade;
+  bandId: BandId;
   stage: PracticeStage;
   index: number;
   total: number;
