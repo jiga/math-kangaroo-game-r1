@@ -650,6 +650,13 @@ function applyGuidedChoiceLayout(): void {
   chooseOptionLayout(container, buttons, !qs<HTMLElement>("#guided-visual").hidden, true);
 }
 
+function setGuidedRangeShellValue(shell: HTMLElement, control: Extract<GuidedControl, { kind: "range" }>, value: number): void {
+  const span = Math.max(1, control.max - control.min);
+  const clamped = Math.max(control.min, Math.min(control.max, value));
+  const pct = ((clamped - control.min) / span) * 100;
+  shell.style.setProperty("--range-pct", `${pct}%`);
+}
+
 function renderGuidedTopicBrowser(): void {
   hideCoach();
   hideLearnPanel();
@@ -788,7 +795,21 @@ function renderGuidedStage(preserveScroll = false): void {
         input.max = String(activeControl.max);
         input.step = String(activeControl.step || 1);
         input.value = String(current);
-        input.addEventListener("input", () => setGuidedValue(activeControl.key, Number(input.value)));
+
+        const rangeShell = document.createElement("div");
+        rangeShell.className = "guided-control-range-shell";
+        rangeShell.innerHTML = `
+          <div class="guided-control-range-track">
+            <div class="guided-control-range-fill"></div>
+            <div class="guided-control-range-thumb" aria-hidden="true"></div>
+          </div>
+        `;
+        setGuidedRangeShellValue(rangeShell, activeControl, current);
+        input.addEventListener("input", () => {
+          setGuidedRangeShellValue(rangeShell, activeControl, Number(input.value));
+          setGuidedValue(activeControl.key, Number(input.value));
+        });
+        rangeShell.appendChild(input);
 
         const plus = document.createElement("button");
         plus.type = "button";
@@ -796,7 +817,7 @@ function renderGuidedStage(preserveScroll = false): void {
         plus.textContent = "+";
         plus.addEventListener("click", () => setGuidedValue(activeControl.key, Math.min(activeControl.max, current + (activeControl.step || 1))));
 
-        row.append(minus, input, plus);
+        row.append(minus, rangeShell, plus);
         controlDeck.appendChild(row);
       } else {
         const row = document.createElement("div");
