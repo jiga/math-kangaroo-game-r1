@@ -520,7 +520,7 @@ function syncGuidedControlSelection(controls: GuidedControl[]): void {
 
 function setGuidedControlKey(key: string): void {
   state.guidedControlKey = key;
-  renderGuidedStage();
+  renderGuidedStage(true);
 }
 
 function isGuidedControlTuningAvailable(): boolean {
@@ -641,7 +641,7 @@ function setGuidedValue(key: string, value: number | string, resetSelection = tr
     state.guidedStepResolved = !(currentGuidedStage()?.prompt && currentGuidedStage()?.options && currentGuidedStage()?.correctIndex);
   }
 
-  renderGuidedStage();
+  renderGuidedStage(true);
 }
 
 function applyGuidedChoiceLayout(): void {
@@ -688,7 +688,12 @@ function renderGuidedTopicBrowser(): void {
   scheduleRailRefresh();
 }
 
-function renderGuidedStage(): void {
+function restoreGuidedStageScroll(card: HTMLElement, scrollTop: number): void {
+  const maxScroll = Math.max(0, card.scrollHeight - card.clientHeight);
+  card.scrollTop = Math.max(0, Math.min(scrollTop, maxScroll));
+}
+
+function renderGuidedStage(preserveScroll = false): void {
   const topic = currentGuidedTopic();
   const stage = currentGuidedStage();
   if (!topic || !stage) {
@@ -703,9 +708,10 @@ function renderGuidedStage(): void {
   const browser = qs<HTMLElement>("#topic-browser");
   const panel = qs<HTMLElement>("#guided-panel");
   const card = qs<HTMLElement>(".question-card");
+  const previousScrollTop = preserveScroll ? card.scrollTop : 0;
   browser.hidden = true;
   panel.hidden = false;
-  card.scrollTop = 0;
+  if (!preserveScroll) card.scrollTop = 0;
   setPreferredScrollTarget(card);
 
   updateHudForGuidedLearn(false);
@@ -844,7 +850,10 @@ function renderGuidedStage(): void {
     feedback.hidden = !state.guidedFeedback;
     feedback.textContent = state.guidedFeedback;
     feedback.className = `guided-choice-feedback${state.guidedFeedbackTone ? ` ${state.guidedFeedbackTone}` : ""}`;
-    scheduleRailRefresh(() => applyGuidedChoiceLayout());
+    scheduleRailRefresh(() => {
+      applyGuidedChoiceLayout();
+      if (preserveScroll) restoreGuidedStageScroll(card, previousScrollTop);
+    });
   } else {
     prompt.hidden = true;
     options.hidden = true;
@@ -859,8 +868,12 @@ function renderGuidedStage(): void {
   nextButton.textContent = isLast ? "DONE" : "NEXT";
   nextButton.disabled = hasCheck && !state.guidedStepResolved;
 
-  armScrollRailPulse();
-  scheduleRailRefresh();
+  if (!preserveScroll) armScrollRailPulse();
+  if (!hasCheck) {
+    scheduleRailRefresh(() => {
+      if (preserveScroll) restoreGuidedStageScroll(card, previousScrollTop);
+    });
+  }
 }
 
 function startGuidedTopic(topicId: GuidedTopicId): void {
@@ -900,7 +913,7 @@ function onGuidedChoice(index: number): void {
     state.guidedFeedbackTone = "retry";
   }
 
-  renderGuidedStage();
+  renderGuidedStage(true);
 }
 
 function advanceGuidedStage(): void {
