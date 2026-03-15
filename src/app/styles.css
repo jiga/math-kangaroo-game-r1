@@ -1499,6 +1499,64 @@ body[data-compact-height="true"] .scroll-rail-step {
   min-height: 14px;
 }
 
+body[data-theme="neon"] {
+  --bg: #04110c;
+  --card: #071a13;
+  --text: #effff4;
+  --muted: #9ec8b1;
+  --line: #1d5944;
+  --accent: #4fffb3;
+  --accent2: #18c97b;
+  --option-bg: #0a2319;
+  --range-track: rgba(158, 200, 177, 0.28);
+  --range-fill: #4fffb3;
+  --range-fill-end: #a9ffd9;
+  --range-thumb: #d6ffee;
+  --range-thumb-border: #1d5944;
+  --range-thumb-ring: rgba(79, 255, 179, 0.22);
+  --range-thumb-ring-focus: rgba(24, 201, 123, 0.32);
+  background:
+    radial-gradient(circle at 22% 12%, rgba(58, 139, 98, 0.28), transparent 36%),
+    radial-gradient(circle at 84% 18%, rgba(31, 84, 63, 0.32), transparent 32%),
+    linear-gradient(180deg, #0a2017 0%, #06130e 58%, #030906 100%);
+}
+
+body[data-theme="neon"] .app {
+  text-shadow: none;
+}
+
+body[data-theme="neon"] .card {
+  box-shadow:
+    0 0 0 1px rgba(61, 131, 96, 0.42),
+    0 0 18px rgba(49, 171, 114, 0.14),
+    inset 0 0 0 1px rgba(199, 255, 227, 0.05);
+}
+
+body[data-theme="neon"] .btn-start {
+  color: #04110c;
+  background: linear-gradient(90deg, #44f5a4, #8af7c7);
+  box-shadow: 0 8px 20px rgba(51, 214, 137, 0.2);
+}
+
+body[data-theme="neon"] .guided-visual,
+body[data-theme="neon"] .learn-visual,
+body[data-theme="neon"] .question-visual,
+body[data-theme="neon"] .coach-visual {
+  background:
+    radial-gradient(circle at 30% 18%, rgba(73, 169, 114, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(13, 43, 30, 0.92), rgba(9, 29, 22, 0.96));
+}
+
+body[data-theme="neon"] .action-hint,
+body[data-theme="neon"] .guided-derivation,
+body[data-theme="neon"] .learn-progress,
+body[data-theme="neon"] .coach-body,
+body[data-theme="neon"] .guided-controls,
+body[data-theme="neon"] .learn-panel,
+body[data-theme="neon"] .scroll-rail-track {
+  backdrop-filter: none;
+}
+
 body[data-theme="gameboy"] {
   --bg: #8aac0f;
   --card: #9bbc0f;
