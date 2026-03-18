@@ -191,6 +191,33 @@ export function renderCube(filledFaces: number): VisualAssetSpec {
   };
 }
 
+export function renderCuboid(markedFaces: number): VisualAssetSpec {
+  const faceMarks = [
+    [82, 42],
+    [126, 38],
+    [83, 74],
+    [153, 61]
+  ];
+  const marks = faceMarks
+    .slice(0, Math.max(0, Math.min(markedFaces, faceMarks.length)))
+    .map(([x, y]) => `<rect x='${x - 6}' y='${y - 6}' width='12' height='12' rx='2' fill='currentColor' fill-opacity='0.86'/>`)
+    .join("");
+  const inner = `
+    <polygon points='54,36 118,20 180,36 116,52' fill='currentColor' fill-opacity='0.05' stroke='currentColor' stroke-width='2.5'/>
+    <polygon points='54,36 54,88 116,104 116,52' fill='currentColor' fill-opacity='0.03' stroke='currentColor' stroke-width='2.5'/>
+    <polygon points='116,52 116,104 180,88 180,36' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>
+    <line x1='86' y1='28' x2='86' y2='96' stroke='currentColor' stroke-opacity='0.16' stroke-width='1.5'/>
+    <line x1='148' y1='28' x2='148' y2='96' stroke='currentColor' stroke-opacity='0.16' stroke-width='1.5'/>
+    <line x1='54' y1='62' x2='180' y2='62' stroke='currentColor' stroke-opacity='0.16' stroke-width='1.5'/>
+    ${marks}
+  `;
+  return {
+    kind: "cube",
+    svg: wrap(frame(inner)),
+    altText: `Cuboid drawing with ${markedFaces} marked rectangular faces`
+  };
+}
+
 export function renderSymmetry(pattern: number[]): VisualAssetSpec {
   const left = pattern
     .map((v, row) => `<rect x='${52 + v * 16}' y='${18 + row * 16}' width='12' height='12' fill='currentColor'/>`)

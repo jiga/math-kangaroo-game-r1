@@ -1,6 +1,6 @@
 import type { Grade, SkillId } from "../domain/types";
 import type { GuidedTopic, GuidedTopicId, LessonValue } from "./guidedTypes";
-import { renderBrokenLine, renderCube, renderPictograph, renderSymmetry, renderVenn } from "../render/visualQuestionRenderer";
+import { renderBrokenLine, renderCube, renderCuboid, renderMaze, renderPictograph, renderSymmetry, renderVenn } from "../render/visualQuestionRenderer";
 import { GUIDED_TOPICS as G34_TOPICS } from "../content/bands/g34/guidedLessons";
 import { GUIDED_TOPICS as G56_TOPICS } from "../content/bands/g56/guidedLessons";
 import { GUIDED_TOPICS as G78_TOPICS } from "../content/bands/g78/guidedLessons";
@@ -350,6 +350,123 @@ function regionVisual(left: number, right: number): VisualAssetSpec {
   };
 }
 
+function thermometerVisual(cold: number, warm: number): VisualAssetSpec {
+  const coldHeight = 18 + Math.max(0, cold + 5) * 4;
+  const warmHeight = 18 + Math.max(0, warm + 5) * 4;
+  return {
+    kind: "lesson",
+    svg: svg(
+      scene(`
+        <g transform='translate(54 26)'>
+          <rect x='0' y='0' width='22' height='60' rx='11' fill='none' stroke='currentColor' stroke-width='2'/>
+          <circle cx='11' cy='88' r='10' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='2'/>
+          <rect x='6' y='${84 - coldHeight}' width='10' height='${coldHeight}' rx='5' fill='currentColor' fill-opacity='0.75'/>
+          <text x='11' y='106' text-anchor='middle' font-size='10' font-weight='700' fill='currentColor'>${cold}°</text>
+        </g>
+        <g transform='translate(144 26)'>
+          <rect x='0' y='0' width='22' height='60' rx='11' fill='none' stroke='currentColor' stroke-width='2'/>
+          <circle cx='11' cy='88' r='10' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='2'/>
+          <rect x='6' y='${84 - warmHeight}' width='10' height='${warmHeight}' rx='5' fill='currentColor' fill-opacity='0.75'/>
+          <text x='11' y='106' text-anchor='middle' font-size='10' font-weight='700' fill='currentColor'>${warm}°</text>
+        </g>
+      `)
+    ),
+    altText: `Two thermometers showing ${cold} degrees and ${warm} degrees`
+  };
+}
+
+function calendarFactsVisual(kind: "week" | "year"): VisualAssetSpec {
+  const count = kind === "week" ? 7 : 12;
+  const label = kind === "week" ? "days" : "months";
+  const cells = Array.from({ length: count })
+    .map((_, index) => {
+      const col = index % (kind === "week" ? 7 : 4);
+      const row = Math.floor(index / (kind === "week" ? 7 : 4));
+      const x = kind === "week" ? 24 + col * 27 : 48 + col * 34;
+      const y = kind === "week" ? 46 : 42 + row * 24;
+      return `<rect x='${x}' y='${y}' width='20' height='18' rx='5' fill='currentColor' fill-opacity='0.12' stroke='currentColor' stroke-width='1.4'/>`;
+    })
+    .join("");
+  return {
+    kind: "lesson",
+    svg: svg(scene(`${badge(22, 14, kind === "week" ? "one week" : "one year")}${cells}${svgSingleLineText(120, 104, `${count} ${label}`, { size: 12, weight: 700, maxWidth: 150 })}`)),
+    altText: `Calendar fact showing ${count} ${label} in one ${kind}`
+  };
+}
+
+function rotationVisual(turns: number): VisualAssetSpec {
+  const directions = ["up", "right", "down", "left"];
+  const active = directions[((turns % 4) + 4) % 4];
+  const arrow = (x: number, y: number, rotate: number, activeArrow: boolean) => `
+    <g transform='translate(${x} ${y}) rotate(${rotate})'>
+      <path d='M -12 10 L 0 -12 L 12 10 L 4 10 L 4 18 L -4 18 L -4 10 Z' fill='currentColor' fill-opacity='${activeArrow ? 0.82 : 0.2}' stroke='currentColor' stroke-width='1.6'/>
+    </g>
+  `;
+  return {
+    kind: "lesson",
+    svg: svg(
+      scene(`
+        ${badge(22, 14, "turn the shape")}
+        ${arrow(64, 68, 0, active === "up")}
+        ${arrow(112, 68, 90, active === "right")}
+        ${arrow(160, 68, 180, active === "down")}
+        ${arrow(208, 68, 270, active === "left")}
+      `)
+    ),
+    altText: `Arrows showing a shape turned to face ${active}`
+  };
+}
+
+function chanceWordVisual(mode: "equal" | "certain" | "impossible"): VisualAssetSpec {
+  const chips =
+    mode === "equal"
+      ? `<circle cx='86' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/><circle cx='120' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/>`
+      : mode === "certain"
+        ? Array.from({ length: 4 })
+            .map((_, index) => `<circle cx='${72 + index * 24}' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/>`)
+            .join("")
+        : `<circle cx='72' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/><circle cx='96' cy='66' r='12' fill='currentColor' fill-opacity='0.16'/><circle cx='120' cy='66' r='12' fill='currentColor' fill-opacity='0.16'/><circle cx='144' cy='66' r='12' fill='currentColor' fill-opacity='0.16'/>`;
+  const label = mode === "equal" ? "same number each" : mode === "certain" ? "all outcomes match" : "no matching outcome";
+  return {
+    kind: "lesson",
+    svg: svg(scene(`${badge(22, 14, label)}${chips}`)),
+    altText: `Chance word visual for ${mode}`
+  };
+}
+
+function measureObjectVisual(kind: "length" | "weight" | "capacity"): VisualAssetSpec {
+  const inner =
+    kind === "length"
+      ? `
+        ${badge(22, 14, "measure length")}
+        <rect x='48' y='74' width='108' height='6' rx='3' fill='currentColor' fill-opacity='0.18'/>
+        <rect x='52' y='58' width='90' height='10' rx='5' fill='currentColor' fill-opacity='0.78'/>
+        <line x1='48' y1='88' x2='156' y2='88' stroke='currentColor' stroke-width='2'/>
+        ${Array.from({ length: 7 }).map((_, index) => `<line x1='${48 + index * 18}' y1='88' x2='${48 + index * 18}' y2='80' stroke='currentColor' stroke-width='1.3'/>`).join("")}
+      `
+      : kind === "weight"
+        ? `
+          ${badge(22, 14, "measure weight")}
+          <circle cx='84' cy='66' r='16' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='2'/>
+          <path d='M 68 66 C 70 52 98 52 100 66' fill='none' stroke='currentColor' stroke-width='2'/>
+          <rect x='124' y='56' width='34' height='24' rx='5' fill='currentColor' fill-opacity='0.12' stroke='currentColor' stroke-width='2'/>
+          <line x1='141' y1='38' x2='141' y2='56' stroke='currentColor' stroke-width='2'/>
+          <line x1='129' y1='38' x2='153' y2='38' stroke='currentColor' stroke-width='2'/>
+        `
+        : `
+          ${badge(22, 14, "measure capacity")}
+          <rect x='80' y='36' width='34' height='46' rx='6' fill='none' stroke='currentColor' stroke-width='2'/>
+          <path d='M 86 78 L 108 78 L 108 52 L 96 44 L 86 52 Z' fill='currentColor' fill-opacity='0.2'/>
+          <rect x='124' y='48' width='26' height='34' rx='5' fill='none' stroke='currentColor' stroke-width='2'/>
+          <rect x='128' y='58' width='18' height='20' rx='4' fill='currentColor' fill-opacity='0.2'/>
+        `;
+  return {
+    kind: "lesson",
+    svg: svg(scene(inner)),
+    altText: `Measurement visual for ${kind}`
+  };
+}
+
 const G12_TOPICS: GuidedTopic[] = [
   {
     id: "counting_patterns",
@@ -377,29 +494,27 @@ const G12_TOPICS: GuidedTopic[] = [
         speak: (v) => `Start at ${asNumber(v, "start")} and jump by ${asNumber(v, "step")}. Keep the same rule every time.`
       },
       {
-        id: "next",
-        title: "Check The Next Number",
-        body: (v) => `Now use the same jump rule without recounting from the start.`,
-        derivation: (v) => `The next number is the last number plus the jump.`,
+        id: "rule-check",
+        title: "Name The Jump Rule",
+        body: (v) => `Math Kangaroo for Grades 1-2 wants one clear rule. Say the jump instead of extending the sequence.`,
+        derivation: (v) => `Each jump changes by ${asNumber(v, "step")}.`,
         visual: (v) => sequenceVisual(asNumber(v, "start"), asNumber(v, "step"), asNumber(v, "count")),
         controls: [
           { kind: "range", key: "start", label: "start", min: 1, max: 12 },
           { kind: "range", key: "step", label: "jump", min: 1, max: 4 }
         ],
         prompt: (v) => {
-          const start = asNumber(v, "start");
           const step = asNumber(v, "step");
-          return `What number comes after ${start + step * 3}?`;
+          return `Which rule matches the pattern?`;
         },
         options: (v) => {
-          const start = asNumber(v, "start");
           const step = asNumber(v, "step");
-          return numberChoice(start + step * 4, [-1, 0, 2]).options;
+          return [`add ${Math.max(1, step - 1)}`, `add ${step}`, `subtract ${step}`];
         },
-        correctIndex: (v) => numberChoice(asNumber(v, "start") + asNumber(v, "step") * 4, [-1, 0, 2]).correctIndex,
-        success: (v) => `Correct. Add the same jump again: ${asNumber(v, "step")}.`,
-        retry: (v) => `Keep one rule. Add ${asNumber(v, "step")} to the last number.`,
-        speak: (v) => `Use the same jump again. Do not restart the whole count.`
+        correctIndex: () => 1,
+        success: (v) => `Correct. The pattern uses the same jump: add ${asNumber(v, "step")}.`,
+        retry: (v) => `Compare the first jump and the second jump. They both add ${asNumber(v, "step")}.`,
+        speak: (v) => `The rule is add ${asNumber(v, "step")}. Say the jump, not a new sequence.`
       },
       {
         id: "ordinal",
@@ -725,20 +840,88 @@ const G12_TOPICS: GuidedTopic[] = [
     summary: "Use the right unit, total coin values, and move time or days carefully.",
     skills: ["measurement_small", "money_small", "clock_full_half", "calendar"],
     grades: [1, 2],
-    initialValues: { length: 6, pennies: 1, nickels: 1, dimes: 1, hour: 3, halfTurn: "half", day: 6, move: 2 },
+    initialValues: {
+      measureKind: "length",
+      tempCold: 4,
+      tempWarm: 9,
+      pennies: 1,
+      nickels: 1,
+      dimes: 1,
+      hour: 3,
+      halfTurn: "half",
+      day: 6,
+      move: 2,
+      cycleKind: "week"
+    },
     stages: [
       {
         id: "measure",
-        title: "Measure Length In Units",
-        body: () => `Use a length unit for objects like pencils and paths.`,
-        derivation: (v) => `${asNumber(v, "length")} centimeters is a length measure.`,
-        visual: (v) => rulerVisual(asNumber(v, "length")),
-        controls: [{ kind: "range", key: "length", label: "length", min: 2, max: 9 }],
-        prompt: (v) => `Which unit fits a pencil best?`,
-        options: () => ["liters", "centimeters", "kilograms"],
+        title: "Match The Right Unit",
+        body: (v) => `Length, weight, and capacity use different units. Match the object to what is being measured.`,
+        derivation: (v) =>
+          asString(v, "measureKind") === "length"
+            ? "A pencil uses a length unit."
+            : asString(v, "measureKind") === "weight"
+              ? "An apple uses a weight unit."
+              : "A bottle uses a capacity unit.",
+        visual: (v) => measureObjectVisual(asString(v, "measureKind") as "length" | "weight" | "capacity"),
+        controls: [
+          {
+            kind: "toggle",
+            key: "measureKind",
+            label: "object",
+            options: [
+              { label: "PENCIL", value: "length" },
+              { label: "APPLE", value: "weight" },
+              { label: "JUICE", value: "capacity" }
+            ]
+          }
+        ],
+        prompt: (v) =>
+          asString(v, "measureKind") === "length"
+            ? "Which unit fits the pencil best?"
+            : asString(v, "measureKind") === "weight"
+              ? "Which unit fits the apple best?"
+              : "Which unit fits the juice bottle best?",
+        options: (v) =>
+          asString(v, "measureKind") === "length"
+            ? ["liters", "centimeters", "grams"]
+            : asString(v, "measureKind") === "weight"
+              ? ["centimeters", "grams", "weeks"]
+              : ["grams", "milliliters", "meters"],
         correctIndex: () => 1,
-        success: () => `Correct. A pencil is measured by length.`,
-        retry: () => `Pick a length unit for a pencil.`
+        success: (v) =>
+          asString(v, "measureKind") === "length"
+            ? "Correct. A pencil is measured by length."
+            : asString(v, "measureKind") === "weight"
+              ? "Correct. An apple is measured by weight."
+              : "Correct. A bottle of juice is measured by capacity.",
+        retry: () => `Ask what is being measured before choosing the unit.`
+      },
+      {
+        id: "temperature",
+        title: "Compare Temperature",
+        body: () => `A bigger temperature is warmer. A smaller temperature is colder.`,
+        derivation: (v) => {
+          const a = asNumber(v, "tempCold");
+          const b = asNumber(v, "tempWarm");
+          if (a === b) return `${a}° and ${b}° are the same temperature.`;
+          return `${Math.max(a, b)}° is warmer than ${Math.min(a, b)}°.`;
+        },
+        visual: (v) => thermometerVisual(asNumber(v, "tempCold"), asNumber(v, "tempWarm")),
+        controls: [
+          { kind: "range", key: "tempCold", label: "temp A", min: -2, max: 10 },
+          { kind: "range", key: "tempWarm", label: "temp B", min: 2, max: 14 }
+        ],
+        prompt: (v) => `Which temperature is warmer?`,
+        options: (v) => [`${asNumber(v, "tempCold")}°`, `${asNumber(v, "tempWarm")}°`, "same"],
+        correctIndex: (v) => {
+          const a = asNumber(v, "tempCold");
+          const b = asNumber(v, "tempWarm");
+          return a === b ? 2 : a > b ? 0 : 1;
+        },
+        success: () => `Correct. The greater temperature is warmer.`,
+        retry: () => `Compare the two numbers. The bigger one is warmer, and equal means same.`
       },
       {
         id: "money",
@@ -767,7 +950,7 @@ const G12_TOPICS: GuidedTopic[] = [
           { kind: "range", key: "hour", label: "hour", min: 1, max: 11 },
           { kind: "toggle", key: "halfTurn", label: "minutes", options: [{ label: ":00", value: "full" }, { label: ":30", value: "half" }] }
         ],
-        prompt: (v) => `What time is 30 minutes later?`,
+        prompt: (v) => `What time is half an hour later?`,
         options: (v) => {
           const hour = asNumber(v, "hour");
           const half = asString(v, "halfTurn") === "half";
@@ -793,16 +976,39 @@ const G12_TOPICS: GuidedTopic[] = [
         correctIndex: (v) => numberChoice(asNumber(v, "day") + asNumber(v, "move"), [-1, 0, 1]).correctIndex,
         success: () => `Correct. Move forward one day at a time.`,
         retry: () => `Keep the starting day and count forward.`
+      },
+      {
+        id: "calendar-cycles",
+        title: "Know Week And Year Facts",
+        body: (v) => `Calendar problems also use short facts like 7 days in a week and 12 months in a year.`,
+        derivation: (v) => (asString(v, "cycleKind") === "week" ? "1 week = 7 days" : "1 year = 12 months"),
+        visual: (v) => calendarFactsVisual(asString(v, "cycleKind") === "week" ? "week" : "year"),
+        controls: [
+          {
+            kind: "toggle",
+            key: "cycleKind",
+            label: "fact",
+            options: [
+              { label: "WEEK", value: "week" },
+              { label: "YEAR", value: "year" }
+            ]
+          }
+        ],
+        prompt: (v) => (asString(v, "cycleKind") === "week" ? "How many days are in one week?" : "How many months are in one year?"),
+        options: (v) => (asString(v, "cycleKind") === "week" ? ["6", "7", "8"] : ["10", "12", "14"]),
+        correctIndex: () => 1,
+        success: () => `Correct. Keep those calendar facts ready.`,
+        retry: () => `A week has 7 days, and a year has 12 months.`
       }
     ]
   },
   {
     id: "shapes_space",
     title: "Shapes + Space",
-    summary: "Notice side counts, symmetry, cube faces, and picture-based shape moves.",
+    summary: "Notice side counts, maze turns, rotations, and cube or cuboid facts.",
     skills: ["shape_properties", "maze_shape_puzzles", "cube_cuboid_visualization", "symmetry_rotation"],
     grades: [1, 2],
-    initialValues: { sides: 4, filledFaces: 3, symmetryMarks: 3 },
+    initialValues: { sides: 4, filledFaces: 3, symmetryMarks: 3, mazeLeft: 1, mazeRight: 2, rotationTurns: 1, solidType: "cube" },
     stages: [
       {
         id: "sides",
@@ -818,6 +1024,22 @@ const G12_TOPICS: GuidedTopic[] = [
         retry: () => `Trace around the shape and count the sides.`
       },
       {
+        id: "maze",
+        title: "Count The Turns",
+        body: () => `Maze questions often ask about turns or shortest paths. Count the requested turns only.`,
+        derivation: (v) => `This path has ${asNumber(v, "mazeRight")} right turns.`,
+        visual: (v) => renderMaze(212, { leftTurns: asNumber(v, "mazeLeft"), rightTurns: asNumber(v, "mazeRight") }),
+        controls: [
+          { kind: "range", key: "mazeLeft", label: "left turns", min: 1, max: 3 },
+          { kind: "range", key: "mazeRight", label: "right turns", min: 1, max: 3 }
+        ],
+        prompt: (v) => `How many right turns does the path make?`,
+        options: (v) => numberChoice(asNumber(v, "mazeRight"), [-1, 0, 1]).options,
+        correctIndex: (v) => numberChoice(asNumber(v, "mazeRight"), [-1, 0, 1]).correctIndex,
+        success: () => `Correct. Only count the turns the question asks for.`,
+        retry: () => `Track the path one corner at a time and count just the right turns.`
+      },
+      {
         id: "symmetry",
         title: "Mirror Across The Line",
         body: () => `A symmetry line means the other side must match like a mirror.`,
@@ -831,17 +1053,41 @@ const G12_TOPICS: GuidedTopic[] = [
         retry: () => `Think mirror image.`
       },
       {
-        id: "cube",
-        title: "Use Total Faces",
-        body: () => `A cube always has 6 faces, even when some are hidden.`,
-        derivation: (v) => `If ${asNumber(v, "filledFaces")} faces are marked, the others are still there even if you cannot see them all.`,
-        visual: (v) => renderCube(asNumber(v, "filledFaces")),
-        controls: [{ kind: "range", key: "filledFaces", label: "marked", min: 1, max: 5 }],
-        prompt: (v) => `How many faces does a cube have in all?`,
+        id: "rotation",
+        title: "A Turn Is Rotation",
+        body: () => `A rotated shape is the same shape after a turn. It is not a mirror flip.`,
+        derivation: (v) => `${asNumber(v, "rotationTurns")} quarter-turn(s) change the direction but keep the shape the same.`,
+        visual: (v) => rotationVisual(asNumber(v, "rotationTurns")),
+        controls: [{ kind: "range", key: "rotationTurns", label: "quarter turns", min: 0, max: 3 }],
+        prompt: () => `Which word names a turn?`,
+        options: () => ["reflection", "rotation", "stretch"],
+        correctIndex: () => 1,
+        success: () => `Correct. A turn is rotation.`,
+        retry: () => `A rotation is a turn. A reflection is a flip.`
+      },
+      {
+        id: "solid",
+        title: "Cube Or Cuboid, Still 6 Faces",
+        body: (v) => `A cube and a cuboid are both box solids. They both have 6 faces.`,
+        derivation: (v) => `Changing the solid shape does not change the total face count.`,
+        visual: (v) => (asString(v, "solidType") === "cube" ? renderCube(asNumber(v, "filledFaces")) : renderCuboid(asNumber(v, "filledFaces"))),
+        controls: [
+          {
+            kind: "toggle",
+            key: "solidType",
+            label: "solid",
+            options: [
+              { label: "CUBE", value: "cube" },
+              { label: "CUBOID", value: "cuboid" }
+            ]
+          },
+          { kind: "range", key: "filledFaces", label: "marked", min: 1, max: 4 }
+        ],
+        prompt: (v) => `How many faces does this solid have in all?`,
         options: () => ["4", "6", "8"],
         correctIndex: () => 1,
-        success: () => `Correct. A cube has 6 faces total.`,
-        retry: () => `Memorize the solid: a cube has 6 faces.`
+        success: () => `Correct. Both a cube and a cuboid have 6 faces.`,
+        retry: () => `Remember the box-solid fact: 6 faces.`
       }
     ]
   },
@@ -851,7 +1097,7 @@ const G12_TOPICS: GuidedTopic[] = [
     summary: "Read legends before counting and compare data totals carefully.",
     skills: ["pictographs_bar_graphs", "likelihood_vocabulary"],
     grades: [1, 2],
-    initialValues: { rowA: 3, rowB: 5, rowC: 2, iconValue: 2, blueBag: 4, redBag: 2 },
+    initialValues: { rowA: 3, rowB: 5, rowC: 2, iconValue: 2, blueBag: 4, redBag: 2, chanceMode: "equal" },
     stages: [
       {
         id: "legend",
@@ -875,6 +1121,40 @@ const G12_TOPICS: GuidedTopic[] = [
         correctIndex: (v) => numberChoice(asNumber(v, "rowB") * asNumber(v, "iconValue"), [-2, 0, 2]).correctIndex,
         success: () => `Correct. Legend value times picture count gives the total.`,
         retry: () => `Use the legend like multiplication.`
+      },
+      {
+        id: "chance-words",
+        title: "Use The Chance Word",
+        body: () => `Certain means always. Impossible means zero chance. Equal counts mean equally likely.`,
+        derivation: (v) =>
+          asString(v, "chanceMode") === "certain"
+            ? "All outcomes match, so the event is certain."
+            : asString(v, "chanceMode") === "impossible"
+              ? "No outcome matches, so the event is impossible."
+              : "Equal counts mean equally likely.",
+        visual: (v) => chanceWordVisual(asString(v, "chanceMode") as "equal" | "certain" | "impossible"),
+        controls: [
+          {
+            kind: "toggle",
+            key: "chanceMode",
+            label: "situation",
+            options: [
+              { label: "EQUAL", value: "equal" },
+              { label: "CERTAIN", value: "certain" },
+              { label: "IMPOSSIBLE", value: "impossible" }
+            ]
+          }
+        ],
+        prompt: (v) =>
+          asString(v, "chanceMode") === "certain"
+            ? "Which word fits when every marble is blue?"
+            : asString(v, "chanceMode") === "impossible"
+              ? "Which word fits when there are no blue marbles to pick?"
+              : "Which word fits when blue and red counts are the same?",
+        options: () => ["certain", "equally likely", "impossible"],
+        correctIndex: (v) => (asString(v, "chanceMode") === "certain" ? 0 : asString(v, "chanceMode") === "impossible" ? 2 : 1),
+        success: () => `Correct. Match the picture to the chance word.`,
+        retry: () => `Certain means always, impossible means never, and equal counts mean equally likely.`
       },
       {
         id: "more-likely",

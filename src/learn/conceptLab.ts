@@ -300,23 +300,23 @@ const SKILL_BLUEPRINTS: Record<SkillId, LessonBlueprint> = {
     }
   },
   patterns: {
-    objective: "Find one rule and continue it.",
-    intro: "A good pattern repeats or grows by one clear rule. Look at more than one step before deciding.",
+    objective: "Find one rule and describe it clearly.",
+    intro: "A good pattern repeats or grows by one clear rule. In Grades 1-2, spotting the rule matters more than extending a long sequence.",
     trap: "Children often guess from the last item instead of the whole rule.",
     tipSheet: ["Check at least two jumps before answering.", "Say the repeating block or growth rule aloud."],
     quickCheck: {
-      prompt: "What comes next? circle, square, circle, square, __",
-      options: ["circle", "triangle", "square"],
+      prompt: "Which block repeats in circle, square, circle, square?",
+      options: ["circle, square", "circle, circle", "square, square"],
       correctIndex: 0,
-      success: "Correct. The block repeats circle, square.",
-      wrong: "Find the repeating block: circle, square. Then it starts again with circle."
+      success: "Correct. The repeating block is circle, square.",
+      wrong: "Read the whole block: circle, square. Then it starts again."
     },
     transfer: {
-      prompt: "What comes next? 5, 8, 11, __",
-      options: ["12", "14", "15"],
+      prompt: "What is the rule for 5, 8, 11?",
+      options: ["add 2", "add 3", "subtract 3"],
       correctIndex: 1,
       success: "Correct. The pattern adds 3 each time.",
-      wrong: "Check the jump: +3, +3, so the next number is 14."
+      wrong: "Check the jump: +3, then +3 again. The rule is add 3."
     }
   },
   perimeter_broken_lines: {
@@ -400,10 +400,10 @@ const SKILL_BLUEPRINTS: Record<SkillId, LessonBlueprint> = {
     }
   },
   cube_cuboid_visualization: {
-    objective: "Use standard cube facts and count visible marks once.",
-    intro: "A cube has 6 faces, 12 edges, and 8 corners. In pictures, count each visible mark once.",
+    objective: "Use standard cube and cuboid facts and count visible marks once.",
+    intro: "A cube or cuboid has 6 faces. In pictures, count each visible mark once, then use the solid fact if some faces are hidden.",
     trap: "Children may double-count marks or forget to start from 6 faces when finding hidden faces.",
-    tipSheet: ["Memorize 6 faces, 12 edges, 8 corners.", "Scan visible marks left to right."],
+    tipSheet: ["Memorize the box-solid fact: 6 faces.", "Scan visible marks left to right."],
     quickCheck: {
       prompt: "How many faces does a cube have?",
       options: ["4", "6", "8"],
@@ -521,7 +521,7 @@ const SKILL_BLUEPRINTS: Record<SkillId, LessonBlueprint> = {
   },
   clock_full_half: {
     objective: "Translate between words and clock times.",
-    intro: "Full hour means :00 and half past means :30. When you move 30 minutes from :30, the hour changes.",
+    intro: "Full hour means :00 and half past means :30. When you move half an hour from :30, the hour changes.",
     trap: "Children often keep the same hour when moving from :30 to the next full hour.",
     tipSheet: ["Say :00 = full hour and :30 = half past.", "Watch when the hour hand moves to the next hour."],
     quickCheck: {
@@ -532,7 +532,7 @@ const SKILL_BLUEPRINTS: Record<SkillId, LessonBlueprint> = {
       wrong: "Half past means :30."
     },
     transfer: {
-      prompt: "What time is 30 minutes after 6:30?",
+      prompt: "What time is half an hour after 6:30?",
       options: ["6:60", "7:00", "7:30"],
       correctIndex: 1,
       success: "Correct. Thirty minutes after 6:30 is 7:00.",
@@ -689,11 +689,11 @@ const FAMILY_OVERRIDES: Partial<Record<string, LessonOverride>> = {
   },
   half_hour_later: {
     transfer: {
-      prompt: "What time is 30 minutes after 3:30?",
+      prompt: "What time is half an hour after 3:30?",
       options: ["4:00", "4:30", "3:60"],
       correctIndex: 0,
       success: "Correct. One half-hour after 3:30 is 4:00.",
-      wrong: "From :30, another 30 minutes reaches the next full hour."
+      wrong: "From :30, another half hour reaches the next full hour."
     }
   },
   hidden_faces: {

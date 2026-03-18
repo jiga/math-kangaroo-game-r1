@@ -10,6 +10,7 @@ import type {
 import {
   renderBrokenLine,
   renderCube,
+  renderCuboid,
   renderMaze,
   renderPictograph,
   renderRegionCompare,
@@ -678,7 +679,8 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         const cases = [
           { prompt: "Which unit is best to measure the length of a pencil?", correct: "centimeters", pool: ["centimeters", "meters", "kilograms", "liters", "days"] },
           { prompt: "Which unit is best to measure the weight of an apple?", correct: "grams", pool: ["grams", "liters", "meters", "weeks", "centimeters"] },
-          { prompt: "Which unit is best to measure a bottle of juice?", correct: "milliliters", pool: ["milliliters", "meters", "kilograms", "minutes", "centimeters"] }
+          { prompt: "Which unit is best to measure a bottle of juice?", correct: "milliliters", pool: ["milliliters", "meters", "kilograms", "minutes", "centimeters"] },
+          { prompt: "Which unit tells temperature?", correct: "degrees", pool: ["degrees", "centimeters", "kilograms", "liters", "hours"] }
         ];
         const pick = cases[rng.int(0, cases.length - 1)];
         return {
@@ -688,6 +690,21 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
           explanation: `${pick.correct} is the sensible unit for that object.`,
           strategyTags: ["match the object to the unit", "think about what is being measured"],
           trapWarning: "Pick a length unit for length, a weight unit for weight, and a capacity unit for liquids."
+        };
+      }
+    },
+    {
+      familyId: "temperature_compare",
+      generate: (_ctx, rng) => {
+        const a = rng.int(-2, 12);
+        const b = a + rng.int(2, 7);
+        return {
+          prompt: `Which temperature is warmer: ${a}° or ${b}°?`,
+          correct: `${b}°`,
+          distractors: textDistractors(`${b}°`, [`${a}°`, "They are equal", `${b - 1}°`, `${a + 1}°`, `${b + 2}°`]),
+          explanation: `The warmer temperature is the greater number. ${b} is greater than ${a}.`,
+          strategyTags: ["compare the numbers", "warmer means greater temperature"],
+          trapWarning: "A smaller temperature means colder, not warmer."
         };
       }
     },
@@ -715,14 +732,14 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       generate: (ctx, rng) => {
         const step = tierNumber(rng, ctx.pointTier, 1, 3, 5);
         const start = tierNumber(rng, ctx.pointTier, 1, 7, 16);
-        const correct = start + step * 3;
+        const correct = `add ${step}`;
         return {
-          prompt: `Find the rule and the next number: ${start}, ${start + step}, ${start + step * 2}, ?`,
-          correct: String(correct),
-          distractors: numericDistractors(correct, [step, -step, 1, -1]),
-          explanation: `The pattern adds ${step} each time, so the next number is ${correct}.`,
-          strategyTags: ["compare two jumps", "continue the same rule"],
-          trapWarning: "A pattern should use one clear rule."
+          prompt: `What is the rule for ${start}, ${start + step}, ${start + step * 2}?`,
+          correct,
+          distractors: textDistractors(correct, [`add ${step + 1}`, `add ${Math.max(1, step - 1)}`, `subtract ${step}`, "double the number"]),
+          explanation: `Each jump is +${step}, so the rule is add ${step}.`,
+          strategyTags: ["compare two jumps", "name the same rule"],
+          trapWarning: "Do not guess from only one pair; check the jump twice."
         };
       }
     },
@@ -730,18 +747,18 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       familyId: "repeating_shape_pattern",
       generate: (_ctx, rng) => {
         const families = [
-          { prompt: "square, circle, square, circle, ?", correct: "square" },
-          { prompt: "triangle, triangle, star, triangle, triangle, star, ?", correct: "triangle" },
-          { prompt: "red, blue, red, blue, ?", correct: "red" }
+          { prompt: "square, circle, square, circle", correct: "square, circle" },
+          { prompt: "triangle, triangle, star, triangle, triangle, star", correct: "triangle, triangle, star" },
+          { prompt: "red, blue, red, blue", correct: "red, blue" }
         ];
         const pick = families[rng.int(0, families.length - 1)];
         return {
-          prompt: `What comes next in the pattern? ${pick.prompt}`,
+          prompt: `Which repeating block matches this pattern? ${pick.prompt}`,
           correct: pick.correct,
-          distractors: textDistractors(pick.correct, ["square", "circle", "triangle", "star", "red", "blue"]),
-          explanation: `Repeat the pattern block to find the next item: ${pick.correct}.`,
-          strategyTags: ["find the repeating block", "restart the pattern block"],
-          trapWarning: "Look at the whole repeating block, not just the last item."
+          distractors: textDistractors(pick.correct, ["square, square", "circle, square", "triangle, star", "red, red", "blue, red"]),
+          explanation: `The pattern repeats the same block: ${pick.correct}.`,
+          strategyTags: ["find the repeating block", "read the whole block"],
+          trapWarning: "Look for the full block, not just the last object."
         };
       }
     },
@@ -750,14 +767,14 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       generate: (_ctx, rng) => {
         const start = rng.int(1, 4);
         const add = rng.int(1, 3);
-        const correct = start + add * 3;
+        const correct = add;
         return {
-          prompt: `A block tower has ${start}, ${start + add}, ${start + add * 2} blocks in the first three pictures. How many blocks are in the next picture?`,
+          prompt: `A block tower has ${start}, ${start + add}, ${start + add * 2} blocks in the first three pictures. By how many blocks does it grow each time?`,
           correct: String(correct),
-          distractors: numericDistractors(correct, [add, -add, 1, -1], 0),
-          explanation: `The tower grows by ${add} blocks each time, so the next tower has ${correct} blocks.`,
-          strategyTags: ["watch how much it grows", "extend the pattern once"],
-          trapWarning: "Do not add different amounts on each step."
+          distractors: numericDistractors(correct, [1, -1, 2, -2], 0),
+          explanation: `The pattern grows by ${add} block(s) each time.`,
+          strategyTags: ["watch how much it grows", "compare the change between pictures"],
+          trapWarning: "This asks for the growth rule, not the next picture."
         };
       }
     }
@@ -1028,6 +1045,23 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
           trapWarning: "Use the total number of faces first."
         };
       }
+    },
+    {
+      familyId: "cuboid_facts",
+      format: "svg",
+      generate: (_ctx, rng) => {
+        const marked = rng.int(1, 4);
+        return {
+          prompt: "How many faces does a cuboid have?",
+          correct: "6",
+          distractors: textDistractors("6", ["4", "5", "6", "7", "8"]),
+          explanation: "A cuboid has 6 faces, just like a box-shaped solid.",
+          strategyTags: ["remember cuboid facts", "box-shaped solids still have 6 faces"],
+          trapWarning: "A cuboid may look stretched, but it still has 6 faces.",
+          format: "svg",
+          visualAssetSpec: renderCuboid(marked)
+        };
+      }
     }
   ],
   likelihood_vocabulary: [
@@ -1252,6 +1286,23 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
           trapWarning: "After and before are opposite directions."
         };
       }
+    },
+    {
+      familyId: "week_year_facts",
+      generate: (_ctx, rng) => {
+        const ask = rng.pick([
+          { prompt: "How many days are in one week?", correct: "7", pool: ["5", "6", "7", "10", "12"] },
+          { prompt: "How many months are in one year?", correct: "12", pool: ["7", "10", "11", "12", "13"] }
+        ]);
+        return {
+          prompt: ask.prompt,
+          correct: ask.correct,
+          distractors: textDistractors(ask.correct, ask.pool),
+          explanation: `${ask.correct} is the calendar fact you need here.`,
+          strategyTags: ["know week and year facts", "use the calendar cycle"],
+          trapWarning: "Do not mix up days in a week with months in a year."
+        };
+      }
     }
   ],
   money_small: [
@@ -1317,7 +1368,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         return {
           prompt: half ? `What digital time is half past ${hour}?` : `What digital time is ${hour} o'clock?`,
           correct,
-          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${(hour % 12) + 1}:00`, `${(hour % 12) + 1}:30`, `${hour}:15`]),
+          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${(hour % 12) + 1}:00`, `${(hour % 12) + 1}:30`, `${((hour + 10) % 12) + 1}:00`]),
           explanation: half ? `Half past ${hour} means ${hour}:30.` : `${hour} o'clock means ${hour}:00.`,
           strategyTags: ["match the words to :00 or :30", "watch the hour carefully"],
           trapWarning: "Half past is :30, not :15."
@@ -1332,11 +1383,11 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         const start = startHalf ? `${hour}:30` : `${hour}:00`;
         const correct = startHalf ? `${hour + 1}:00` : `${hour}:30`;
         return {
-          prompt: `What time is 30 minutes after ${start}?`,
+          prompt: `What time is half an hour after ${start}?`,
           correct,
-          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${hour + 1}:00`, `${hour + 1}:30`, `${hour}:15`]),
-          explanation: `Thirty minutes is half an hour. Move from :00 to :30 or from :30 to the next hour.`,
-          strategyTags: ["30 minutes means half an hour", "watch when the hour changes"],
+          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${hour + 1}:00`, `${hour + 1}:30`, `${hour - 1}:30`]),
+          explanation: `Half an hour moves from :00 to :30 or from :30 to the next hour.`,
+          strategyTags: ["half an hour means :30", "watch when the hour changes"],
           trapWarning: "From :30, the next half-hour lands on the next full hour."
         };
       }
@@ -1349,11 +1400,11 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         const start = startHalf ? `${hour}:30` : `${hour}:00`;
         const correct = startHalf ? `${hour}:00` : `${hour - 1}:30`;
         return {
-          prompt: `What time is 30 minutes before ${start}?`,
+          prompt: `What time is half an hour before ${start}?`,
           correct,
-          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${hour - 1}:30`, `${hour - 1}:00`, `${hour}:15`]),
+          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${hour - 1}:30`, `${hour - 1}:00`, `${hour + 1}:00`]),
           explanation: `Move back half an hour from ${start} to get ${correct}.`,
-          strategyTags: ["move back 30 minutes", "borrow from the earlier hour when needed"],
+          strategyTags: ["move back half an hour", "borrow from the earlier hour when needed"],
           trapWarning: "Before means move backward in time."
         };
       }
@@ -1662,14 +1713,14 @@ const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
         const a = rng.int(2, 8);
         const b = a + rng.int(1, 4);
         const values = [a, b, a, b];
-        const correct = a;
+        const correct = `${a}, ${b}`;
         return {
-          prompt: `What comes next? ${values.join(", ")}, ?`,
-          correct: String(correct),
-          distractors: numericDistractors(correct, [1, -1, b - a, a - b]),
-          explanation: `The pattern repeats ${a}, ${b}, ${a}, ${b}, so the next number is ${a}.`,
-          strategyTags: ["look for the repeat block", "say the pattern twice"],
-          trapWarning: "A repeating pattern starts again after the full block."
+          prompt: `Which block repeats in ${values.join(", ")}?`,
+          correct,
+          distractors: textDistractors(correct, [`${b}, ${a}`, `${a}, ${a}`, `${b}, ${b}`, `${a}, ${b}, ${a}`]),
+          explanation: `The pattern repeats the two-number block ${a}, ${b}.`,
+          strategyTags: ["look for the repeat block", "read the pattern in chunks"],
+          trapWarning: "Name the whole block, not just the next number."
         };
       }
     }

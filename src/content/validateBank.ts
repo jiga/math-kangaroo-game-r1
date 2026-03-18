@@ -1,6 +1,9 @@
 import g12Coverage from "./g1g2/coverage-map.json";
+import { G12_CURRICULUM_CHECKLIST } from "./g1g2/curriculumChecklist";
+import { familyIdsForSkill } from "./g1g2/templates";
 import { bankForGrade, bankStatsForGrade, buildContestQuestionsForGrade, buildTemplatesForGrade, questionCountForGrade } from "./bands/index";
 import type { Grade } from "../domain/types";
+import { listGuidedTopics } from "../learn/guidedLessons";
 
 function fail(message: string): never {
   throw new Error(message);
@@ -74,6 +77,54 @@ function validateGrade(grade: Grade): void {
     { 3: 0, 4: 0, 5: 0 }
   );
   assert(tierCount[3] === perTier && tierCount[4] === perTier && tierCount[5] === perTier, `Grade ${grade} contest tier split invalid`);
+
+  if (grade <= 2) {
+    const guidedTopics = listGuidedTopics(grade);
+    const guidedTopicIds = new Set(guidedTopics.map((topic) => topic.id));
+    const guidedStageIds = new Set(guidedTopics.flatMap((topic) => topic.stages.map((stage) => `${topic.id}:${stage.id}`)));
+    const gradeSkills = new Set(rowsForGrade(grade).map((row) => row.skillId));
+
+    for (const bullet of G12_CURRICULUM_CHECKLIST) {
+      const matchedFamilies = new Set<string>();
+      for (const skillId of bullet.skills) {
+        assert(gradeSkills.has(skillId), `Grade ${grade} missing curriculum skill ${skillId} for ${bullet.id}`);
+        const families = familyIdsForSkill(skillId);
+        for (const familyId of bullet.families) {
+          if (families.includes(familyId)) matchedFamilies.add(familyId);
+        }
+      }
+      assert(matchedFamilies.size > 0, `Grade ${grade} missing representative question families for ${bullet.id}`);
+      for (const topicId of bullet.guidedTopicIds) {
+        assert(guidedTopicIds.has(topicId), `Grade ${grade} missing guided topic ${topicId} for ${bullet.id}`);
+      }
+      for (const stageId of bullet.guidedStageIds) {
+        assert(guidedStageIds.has(stageId), `Grade ${grade} missing guided stage ${stageId} for ${bullet.id}`);
+      }
+    }
+
+    for (const template of templates.filter((entry) => entry.skillId === "patterns")) {
+      const question = template.generate({
+        templateId: template.id,
+        grade,
+        bandId: template.bandId,
+        pointTier: template.pointTier,
+        variantSeed: 101
+      });
+      assert(!/what comes next|next number/i.test(question.prompt), `Pattern question ${question.id} should not ask for next item`);
+    }
+
+    for (const template of templates.filter((entry) => entry.skillId === "clock_full_half" && entry.pointTier !== 5)) {
+      const question = template.generate({
+        templateId: template.id,
+        grade,
+        bandId: template.bandId,
+        pointTier: template.pointTier,
+        variantSeed: 202
+      });
+      const combined = [question.prompt, ...question.options, question.explanation].join(" ");
+      assert(!/:15|:45|quarter|30 minutes/i.test(combined), `Clock question ${question.id} should stay on full/half-hour language`);
+    }
+  }
 }
 
 function main(): void {
