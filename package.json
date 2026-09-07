@@ -1,6 +1,6 @@
 {
   "name": "math-kangaroo-game-r1",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "test": "node --test --import tsx ./tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run validate && npm run test",
-    "check:browser": "node ./scripts/check_studio.mjs",
+    "check:browser": "node ./scripts/check_studio.mjs && node ./scripts/check_visual_aids.mjs",
     "dev": "python3 -m http.server 8000 --bind 127.0.0.1 --directory dist",
     "pages:build": "npm run build"
   },

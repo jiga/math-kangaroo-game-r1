@@ -14,6 +14,7 @@ import { escapeHtml, topicGlyph, trailVisual } from "./studioVisuals";
 import { createTrainingProfile, loadTrainingProfile, saveTrainingProfile, planMission, recordTrainingAttempt, getTrainingSummary, type TrainingMission } from "../engine/trainingJourney";
 import { cancelTutorTurn, isAITutorAvailable, requestTutorTurn } from "../coach/aiTutor";
 import { questionContentKey } from "../engine/questionIdentity";
+import { VisualWorkbenchView } from "../learn/visualWorkbenchView";
 import { loadProfile, saveProfileAsync } from "../storage/profileStore";
 import { buildConceptLab, type ConceptLabFlow } from "../learn/conceptLab";
 import {
@@ -61,6 +62,7 @@ let runFinalized = false;
 let missionProvider: ReturnType<typeof createPracticeProviderForGrade> | null = null;
 const missionSeen = new Set<string>();
 let contestAnswers: Array<number | null> = [];
+let visualWorkbench: VisualWorkbenchView;
 const ACTION_HINT_KEY = "mk_icon_hint_seen_v1";
 const SCROLL_STEP = 56;
 const defaultScrollSelectors: Record<ScreenId, string> = {
@@ -333,7 +335,7 @@ function updateScrollRail(): void {
   const track = qs<HTMLElement>("#scroll-rail-track");
   const thumb = qs<HTMLElement>("#scroll-rail-thumb");
   const questionCard = qs<HTMLElement>("#game-screen .question-card");
-  const overlayOpen = qs<HTMLElement>("#coach-overlay").classList.contains("active");
+  const overlayOpen = qs<HTMLElement>("#coach-overlay").classList.contains("active") || visualWorkbench?.isOpen;
   const isGameScreen = document.querySelector<HTMLElement>(".screen.active")?.id === "game-screen";
 
   if (!isGameScreen || overlayOpen) {
@@ -383,6 +385,7 @@ function scheduleRailRefresh(beforeUpdate?: () => void): void {
 }
 
 function setScreen(screenId: ScreenId): void {
+  visualWorkbench?.close();
   const map: Record<string, string> = {
     home: "home-screen",
     game: "game-screen",
@@ -585,6 +588,7 @@ function setOptionsEnabled(enabled: boolean): void {
 }
 
 function setQuestionSolveView(hidden: boolean): void {
+  qs<HTMLElement>("#question-aid").hidden = hidden || state.mode === "contest";
   qs<HTMLElement>("#question-read").hidden = hidden || state.mode === "contest" || !tts.isAvailable();
   qs<HTMLElement>("#question-text").style.display = hidden ? "none" : "block";
   const visual = qs<HTMLElement>("#question-visual");
@@ -1274,6 +1278,7 @@ function findScrollableFromNode(node: EventTarget | null): HTMLElement | null {
 }
 
 function activeScrollTarget(): HTMLElement | null {
+  if (visualWorkbench?.isOpen) return visualWorkbench.scrollTarget;
   const overlay = document.querySelector<HTMLElement>("#coach-overlay.active");
   if (overlay) {
     return overlay.querySelector<HTMLElement>('[data-scrollable="true"]') || overlay;
@@ -1315,6 +1320,10 @@ function bindScrollableFallbacks(): void {
   document.addEventListener(
     "touchstart",
     (event) => {
+      if ((event.target as Element | null)?.closest('[data-workbench-surface][data-drawing="true"]')) {
+        touchScrollState.target = null;
+        return;
+      }
       const scrollable = findScrollableFromNode(event.target);
       if (!scrollable || scrollable.scrollHeight <= scrollable.clientHeight + 2) {
         touchScrollState.target = null;
@@ -1521,6 +1530,7 @@ function startRemediationFlow(question: QuestionInstance): void {
 }
 
 function renderQuestion(): void {
+  visualWorkbench?.close();
   tts.cancelAll();
   cancelTutorTurn();
   assistedCurrent = false;
@@ -1546,6 +1556,7 @@ function renderQuestion(): void {
   state.answeredCurrent = false;
   state.lastAnswerCorrect = null;
   qs<HTMLElement>("#question-read").hidden = state.mode === "contest" || !tts.isAvailable();
+  qs<HTMLElement>("#question-aid").hidden = state.mode === "contest";
   const scrollTarget = qs<HTMLElement>(".question-card");
   scrollTarget.scrollTop = 0;
   setPreferredScrollTarget(scrollTarget);
@@ -1612,8 +1623,7 @@ function renderHelpOverlay(question: QuestionInstance): void {
   const sayButton = qs<HTMLButtonElement>("#coach-say");
   const visual = qs<HTMLElement>("#coach-visual");
   const view = buildHelpView(question, state.helpMode);
-  const topic = listGuidedTopics(state.grade).find((entry) => entry.skills.includes(question.skillId));
-  const visualSpec = question.visualAssetSpec || (topic ? topic.stages[0].visual(topic.initialValues) : undefined);
+  const visualSpec = question.visualAssetSpec;
 
   title.textContent = view.title;
   body.textContent = view.body;
@@ -1655,6 +1665,28 @@ function showCoach(question: QuestionInstance, mode: HelpMode): void {
   renderHelpOverlay(question);
   setPreferredScrollTarget(qs<HTMLElement>("#coach-scroll"));
   scheduleRailRefresh();
+}
+
+function openQuestionWorkbench(): void {
+  const q = currentQuestion();
+  if (!q || state.mode === "contest" || progressActive || !document.querySelector("#game-screen.active")) return;
+  hideCoach();
+  if (!state.answeredCurrent) assistedCurrent = true;
+  visualWorkbench.open({ id: "question:" + q.id + ":" + q.variantKey, grade: state.grade, prompt: q.prompt, skillId: q.skillId, visual: q.visualAssetSpec });
+}
+
+function openLessonWorkbench(): void {
+  const topic = currentGuidedTopic(), stage = currentGuidedStage();
+  if (!topic || !stage) return;
+  const prediction = Boolean(stage.prompt && stage.options && stage.correctIndex) && !state.guidedStepResolved;
+  const visual = prediction && stage.checkVisual ? stage.checkVisual(state.guidedValues) : stage.visual(state.guidedValues);
+  visualWorkbench.open({
+    id: "lesson:" + state.grade + ":" + topic.id + ":" + stage.id + ":" + JSON.stringify(state.guidedValues),
+    grade: state.grade,
+    prompt: stage.prompt ? stage.prompt(state.guidedValues) : stage.body(state.guidedValues),
+    skillId: topic.skills[0],
+    visual
+  });
 }
 
 function hideCoach(): void {
@@ -2045,6 +2077,8 @@ function renderAppToText(): string {
     assisted: assistedCurrent,
     lessonDetour,
     progressActive,
+    visualWorkbench: visualWorkbench?.stateForTesting(),
+    questionClockPaused: state.questionPauseDepth > 0,
     missionReasons: mission?.steps.map((step) => step.reason) || [],
     independentThisMission: sessionIndependent,
     guidedControl: state.guidedControlKey || "",
@@ -2065,6 +2099,22 @@ function renderAppToText(): string {
 }
 
 function wireUi(): void {
+  visualWorkbench = new VisualWorkbenchView({
+    onOpen: () => {
+      tts.cancelAll();
+      cancelTutorTurn();
+      pauseQuestionClock();
+      setPreferredScrollTarget(visualWorkbench.scrollTarget);
+      scheduleRailRefresh();
+    },
+    onClose: () => {
+      tts.cancelAll();
+      resumeQuestionClock();
+      setPreferredScrollTarget(defaultScrollTargetForScreen("game"));
+      scheduleRailRefresh();
+    },
+    speak: (text) => { speakCoach(text); }
+  });
   syncViewportMetrics();
   bindScrollableFallbacks();
   buildGradeButtons();
@@ -2088,6 +2138,9 @@ function wireUi(): void {
   qs<HTMLButtonElement>("#progress-btn").addEventListener("click", showProgress);
   qs<HTMLButtonElement>("#feedback-next").addEventListener("click", next);
   qs<HTMLButtonElement>("#question-read").addEventListener("click", () => { const q = currentQuestion(); if (q && state.mode !== "contest") speakCoach(q.prompt); });
+  qs<HTMLButtonElement>("#question-aid").addEventListener("click", openQuestionWorkbench);
+  qs<HTMLButtonElement>("#coach-aid").addEventListener("click", openQuestionWorkbench);
+  qs<HTMLButtonElement>("#guided-aid").addEventListener("click", openLessonWorkbench);
   qs<HTMLButtonElement>("#feedback-learn").addEventListener("click", exploreCurrentQuestion);
   qs<HTMLButtonElement>("#coach-ai").addEventListener("click", () => { void askTutor(); });
   qs<HTMLButtonElement>("#guided-read").addEventListener("click", speakCurrentGuidedStage);
@@ -2173,6 +2226,7 @@ function wireUi(): void {
     scrollActiveScreen(-SCROLL_STEP);
   });
   window.addEventListener("sideClick", () => {
+    if (visualWorkbench.isOpen) { visualWorkbench.speak(); return; }
     if (progressActive || !document.querySelector("#game-screen.active")) return;
     if (isGuidedLearnMode() && document.querySelector<HTMLElement>("#game-screen.active")) {
       if (currentGuidedTopic()) {

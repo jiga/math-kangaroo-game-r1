@@ -101,6 +101,7 @@ __APP_CSS__
           <details id="guided-notes" class="guided-notes"><summary>Explore the idea</summary><div id="guided-step-body" class="guided-step-body"></div></details>
           <div class="guided-actions">
             <button id="guided-read" class="text-button" aria-label="Read this step aloud">Listen</button>
+            <button id="guided-aid" class="text-button">Work it out</button>
             <button id="guided-next" class="btn btn-start">NEXT</button>
           </div>
           <button id="guided-practice" class="btn" hidden>Try these ideas in a mission</button>
@@ -125,7 +126,8 @@ __APP_CSS__
           </div>
         </div>
         <div id="question-text" class="question-text"></div>
-        <button id="question-read" class="text-button" hidden aria-label="Read the question aloud">Listen to the question</button>
+        <button id="question-read" class="text-button" hidden aria-label="Read the question aloud">Listen</button>
+        <button id="question-aid" class="text-button visual-aid-entry" hidden>Work it out &#8599;</button>
         <div id="question-visual" class="question-visual" aria-live="polite"></div>
         <div id="options" class="options"></div>
         <div id="contest-nav" class="contest-nav" hidden>
@@ -177,12 +179,33 @@ __APP_CSS__
         <div id="coach-scroll" class="coach-scroll" data-scrollable="true" tabindex="0">
           <div id="coach-visual" class="coach-visual" aria-live="polite"></div>
           <div id="coach-body" class="coach-body" aria-live="polite"></div>
+          <button id="coach-aid" class="btn visual-aid-entry">Show me: visual tools</button>
           <button id="coach-ai" class="btn tutor-request">Find me a next step</button>
           <p id="ai-status" class="small-note" aria-live="polite"></p>
         </div>
         <div class="coach-bottom">
           <button id="coach-say" class="btn btn-mode">Listen</button>
           <button id="coach-continue" class="btn btn-start">Back to puzzle</button>
+        </div>
+      </section>
+    </div>
+    <div id="workbench-overlay" class="overlay workbench-overlay" role="dialog" aria-modal="true" aria-labelledby="workbench-title" hidden>
+      <section class="card workbench-card">
+        <header class="workbench-header"><h2 id="workbench-title">Work it out</h2><button id="workbench-close" class="btn" aria-label="Back to your puzzle">Back</button></header>
+        <div id="workbench-tools" class="workbench-tools" role="group" aria-label="Choose a visual tool"></div>
+        <div id="workbench-scroll" class="workbench-scroll" data-scrollable="true" tabindex="0" aria-label="Visual workspace">
+          <details id="workbench-context" class="workbench-context"><summary>Question <span id="workbench-question-preview"></span></summary><p id="workbench-question"></p></details>
+          <p id="workbench-instruction" class="workbench-instruction"></p>
+          <div id="workbench-surface" class="workbench-surface" data-workbench-surface="true"></div>
+          <p id="workbench-caption" class="workbench-caption" aria-live="polite"></p>
+          <div id="workbench-controls" class="workbench-controls"></div>
+          <div class="workbench-edit-tools">
+            <button id="workbench-mark" class="btn" aria-pressed="true">Mark</button>
+            <button id="workbench-pen" class="btn" aria-pressed="false">Pen</button>
+            <button id="workbench-undo" class="btn">Undo</button>
+            <button id="workbench-reset" class="btn">Reset</button>
+          </div>
+          <p class="workbench-note">Your model is a thinking space. Try it, then return to choose your answer.</p>
         </div>
       </section>
     </div>

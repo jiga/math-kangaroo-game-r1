@@ -1,0 +1,172 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+const out = resolve('output/visual-aids');
+await mkdir(out, { recursive: true });
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const cases = [
+  { width: 240, height: 282, grade: 1, theme: 'gameboy' },
+  { width: 240, height: 258, grade: 2, theme: 'neon' },
+  { width: 393, height: 852, grade: 7, theme: 'gameboy' },
+  { width: 1280, height: 800, grade: 12, theme: 'neon' }
+];
+const reports = [];
+try {
+  for (const item of cases) {
+    const page = await browser.newPage({ viewport: { width: item.width, height: item.height }, isMobile: item.width < 500, hasTouch: item.width < 500 });
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+    const state = () => page.evaluate(() => JSON.parse(window.render_game_to_text()));
+    const aid = async () => (await state()).visualWorkbench;
+    const name = 'g' + item.grade + '-' + item.width + '-' + item.theme;
+    const shot = (type) => page.screenshot({ path: resolve(out, name + '-' + type + '.png') });
+    const choose = (tool) => page.locator('[data-aid-tool="' + tool + '"]').click();
+    const increment = (count) => page.locator('[data-aid-control="increase"]').click({ clickCount: 1 }).then(async () => { for (let i = 1; i < count; i++) await page.locator('[data-aid-control="increase"]').click(); });
+    await page.goto(process.env.CHECK_URL || 'http://127.0.0.1:4198');
+    await page.waitForFunction(() => !document.querySelector('#start-btn').disabled);
+    await page.click('#grade-toggle');
+    await page.locator('[data-grade="' + item.grade + '"]').click();
+    await page.click(item.theme === 'neon' ? '#theme-neon' : '#theme-gb');
+    await page.click('#start-btn');
+    const question = (await state()).question;
+    const originalPicture = await page.locator('#question-visual').innerHTML();
+    await page.click('#question-aid');
+    assert.equal((await aid()).open, true);
+    assert.equal((await state()).assisted, true);
+    assert.equal((await state()).questionClockPaused, true);
+    assert.equal(await page.locator('#workbench-question').textContent(), question);
+    if (originalPicture) assert.ok((await page.locator('#workbench-surface').innerHTML()).includes('svg'));
+    await shot('open');
+    const bounds = await page.locator('#workbench-overlay').boundingBox();
+    assert.ok(bounds.x >= -1 && bounds.y >= -1 && bounds.x + bounds.width <= item.width + 1 && bounds.y + bounds.height <= item.height + 1);
+    await choose('counters');
+    await increment(6);
+    assert.equal((await aid()).counters, 6);
+    const first = page.locator('#workbench-surface [data-aid-counter="0"]');
+    await first.scrollIntoViewIfNeeded();
+    await first.click();
+    assert.deepEqual((await aid()).crossed, [0]);
+    await first.focus();
+    await page.keyboard.press('Enter');
+    assert.deepEqual((await aid()).crossed, []);
+    await page.keyboard.press('Space');
+    assert.deepEqual((await aid()).crossed, [0]);
+    await shot('counters');
+    await page.click('#workbench-reset');
+    assert.equal((await aid()).counters, 0);
+    await page.click('#workbench-undo');
+    assert.equal((await aid()).counters, 6);
+    assert.deepEqual((await aid()).crossed, [0]);
+    await choose('fractions');
+    await increment(2);
+    assert.equal((await aid()).parts, 4);
+    await page.locator('#workbench-surface [data-aid-cell="1"]').click();
+    assert.deepEqual((await aid()).shaded, [1]);
+    await shot('fractions');
+    await choose('balance');
+    await increment(3);
+    assert.equal((await aid()).left, 3);
+    assert.match(await page.locator('#workbench-caption').textContent(), /Left is heavier/);
+    await page.locator('[data-aid-control="param-right"]').click();
+    await increment(3);
+    assert.match(await page.locator('#workbench-caption').textContent(), /balance/);
+    await shot('balance');
+    if (item.grade >= 3) {
+      await choose('graph'); await increment(2);
+      assert.equal((await aid()).slope, 2);
+      await page.locator('[data-aid-control="param-intercept"]').click();
+      await increment(1);
+      assert.equal((await aid()).intercept, 1);
+      assert.match(await page.locator('#workbench-caption').textContent(), /y = 2x \+ 1/);
+      await shot('graph');
+    } else assert.equal(await page.locator('[data-aid-tool="graph"]').count(), 0);
+    await choose('picture');
+    await page.locator('#workbench-surface').scrollIntoViewIfNeeded();
+    const surface = await page.locator('#workbench-surface').boundingBox();
+    await page.mouse.click(surface.x + surface.width / 2, surface.y + Math.min(60, surface.height / 2));
+    assert.equal((await aid()).strokes, 1);
+    await page.click('#workbench-pen');
+    await page.locator('#workbench-surface').scrollIntoViewIfNeeded();
+    const drawing = await page.locator('#workbench-surface').boundingBox();
+    await page.mouse.move(drawing.x + 30, drawing.y + 35);
+    await page.mouse.down();
+    await page.mouse.move(drawing.x + 110, drawing.y + 60, { steps: 10 });
+    await page.mouse.up();
+    assert.equal((await aid()).strokes, 2);
+    await shot('annotated');
+    await page.click('#workbench-undo');
+    assert.equal((await aid()).strokes, 1);
+    // Cancelling an in-flight stroke must not consume an Undo entry.
+    await page.locator('#workbench-surface').scrollIntoViewIfNeeded();
+    const cancelled = await page.locator('#workbench-surface').boundingBox();
+    await page.mouse.move(cancelled.x + 30, cancelled.y + 30);
+    await page.mouse.down();
+    await page.mouse.move(cancelled.x + 70, cancelled.y + 50, { steps: 3 });
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await page.click('#question-aid');
+    await page.click('#workbench-undo');
+    assert.equal((await aid()).strokes, 0);
+    await choose('counters');
+    assert.equal((await aid()).counters, 6);
+    const before = await page.locator('#workbench-scroll').evaluate((element) => { element.scrollTop = 0; return element.scrollHeight - element.clientHeight; });
+    await page.evaluate(() => window.dispatchEvent(new Event('scrollDown')));
+    const scrolled = await page.locator('#workbench-scroll').evaluate((element) => element.scrollTop);
+    if (before > 2) assert.ok(scrolled > 0, 'r1 wheel reaches the tools');
+    await page.click('#workbench-close');
+    assert.equal((await state()).questionClockPaused, false);
+    assert.equal((await state()).question, question);
+    if (item.grade <= 2) {
+      await page.click('#question-aid');
+      await choose('fractions'); await page.click('#workbench-reset');
+      await page.locator('[data-aid-control="increase"]').focus();
+      await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
+      assert.equal((await aid()).parts, 4);
+      assert.ok(await page.evaluate(() => document.querySelector('#workbench-overlay').contains(document.activeElement)));
+      await page.keyboard.press('Escape');
+      assert.equal((await aid()).open, false);
+    }
+    await page.click('#coach-btn');
+    await page.click('#coach-aid');
+    assert.equal((await aid()).counters, 6, 'same-question work survives reopening from Help');
+    await page.keyboard.press('Escape');
+    assert.equal((await aid()).open, false);
+    await page.locator('#options .option').first().click();
+    await page.click('#feedback-next');
+    await page.click('#question-aid');
+    assert.equal((await aid()).counters, 0, 'new question gets a clean workspace');
+    await page.click('#workbench-close');
+    await page.click('#home-btn');
+    await page.click('#mode-learn'); await page.click('#start-btn');
+    await page.locator('.topic-card').first().click();
+    const lesson = (await state()).guidedStep;
+    await page.click('#guided-aid');
+    assert.equal((await aid()).open, true);
+    await page.click('#workbench-close');
+    assert.equal((await state()).guidedStep, lesson);
+    if (item.grade === 12) {
+      for (let i = 0; i < 5 && !(await page.locator('#guided-choice-options').isVisible()); i++) await page.click('#guided-next');
+      assert.equal(await page.locator('#guided-choice-options').isVisible(), true);
+      await page.click('#guided-aid'); await choose('picture');
+      const unsolved = await page.locator('#workbench-surface > svg > svg').evaluate((element) => element.outerHTML);
+      await page.click('#workbench-close');
+      await page.locator('.guided-choice-option').first().click();
+      if (await page.locator('#guided-next').isDisabled()) await page.locator('.guided-choice-option').nth(1).click();
+      await page.click('#guided-aid');
+      const solved = await page.locator('#workbench-surface > svg > svg').evaluate((element) => element.outerHTML);
+      assert.notEqual(unsolved, solved, 'Reopened lesson aid refreshes its prediction/result picture');
+      assert.equal(solved, await page.locator('#guided-visual > svg').evaluate((element) => element.outerHTML));
+      await page.click('#workbench-close');
+    }
+    await page.click('#home-btn'); await page.click('#mode-contest'); await page.click('#start-btn');
+    assert.equal(await page.locator('#question-aid').isVisible(), false, 'no workbench in a mock');
+    assert.deepEqual(errors, []);
+    reports.push({ ...item, wheelOverflow: before, wheelScroll: scrolled, errors });
+    await page.close();
+    console.log(name + ' visual aid passed');
+  }
+  await writeFile(resolve(out, 'report.json'), JSON.stringify(reports, null, 2));
+} finally { await browser.close(); }

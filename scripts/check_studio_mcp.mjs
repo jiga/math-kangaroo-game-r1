@@ -62,6 +62,22 @@ try {
     await call('click', { uid: uid[1] });
     const missionState = await evaluate('() => { const s=JSON.parse(window.render_game_to_text()); if(s.total!==6) throw new Error("Mission length"); return s; }');
     await call('take_screenshot', { filePath: resolve(out, name + '-mission.png') });
+    const visualAid = await evaluate((() => {
+      const question = JSON.parse(window.render_game_to_text()).question;
+      document.querySelector('#question-aid').click();
+      document.querySelector('[data-aid-tool="counters"]').click();
+      for (let i = 0; i < 6; i++) document.querySelector('[data-aid-control="increase"]').click();
+      document.querySelector('[data-aid-counter="0"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const state = JSON.parse(window.render_game_to_text());
+      if (!state.visualWorkbench.open || state.visualWorkbench.counters !== 6 || state.visualWorkbench.crossed.length !== 1) throw new Error('Visual aid did not react');
+      if (!state.assisted || !state.questionClockPaused || state.question !== question) throw new Error('Question context changed');
+      const panel = document.querySelector('#workbench-overlay').getBoundingClientRect();
+      if (panel.right > visualViewport.width + (innerWidth - visualViewport.width) / 2 + 1 || panel.height > visualViewport.height + 1) throw new Error('Visual aid exceeds viewport');
+      document.querySelector('#workbench-surface').scrollIntoView({ block: 'center' });
+      return state.visualWorkbench;
+    }).toString());
+    await call('take_screenshot', { filePath: resolve(out, name + '-visual-aid.png') });
+    await evaluate('() => { document.querySelector("#workbench-close").click(); if(JSON.parse(window.render_game_to_text()).questionClockPaused) throw new Error("Question clock did not resume"); return true; }');
     const scroll = await evaluate('() => { const c=document.querySelector(".question-card"); const before=c.scrollTop; window.dispatchEvent(new Event("scrollDown")); return {before,after:c.scrollTop,client:c.clientHeight,total:c.scrollHeight}; }');
     await evaluate('() => { document.querySelector("#home-btn").click(); document.querySelector("#mode-learn").click(); document.querySelector("#start-btn").click(); document.querySelector(".topic-card").click(); return window.render_game_to_text(); }');
     const lessonState = await evaluate((() => {
@@ -76,7 +92,7 @@ try {
     }).toString());
     await call('take_screenshot', { filePath: resolve(out, name + '-lesson.png') });
     await evaluate('() => { document.querySelector("#home-btn").click(); document.querySelector("#mode-practice").click(); return true; }');
-    records.push({ viewport, fit, missionState, scroll, lessonState });
+    records.push({ viewport, fit, missionState, visualAid, scroll, lessonState });
     console.log('Chrome DevTools MCP verified ' + viewport);
   }
   const errors = await call('list_console_messages', { types: ['error'] });

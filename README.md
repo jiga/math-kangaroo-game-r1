@@ -15,6 +15,20 @@ Top-five performance is a training aspiration. This app does not predict ranks o
 
 ## AI and device behavior
 
+### Visual learning aids
+
+Choose **Work it out** in a mission or a topic lab, or **Show me: visual tools** in Help. The full-screen workbench keeps the current question available and offers:
+
+- **Picture:** mark or draw over the actual question/lesson diagram; a blank sketch grid is provided when there is no diagram.
+- **Count:** construct up to 30 counters and tap to cross them out or restore them.
+- **Parts:** split a whole into equal pieces and shade them. Grades 1-2 use halves, thirds, and quarters.
+- **Balance:** adjust both sides and observe which side drops, or make them equal.
+- **Graph:** Grades 3-12 can explore a linear model by adjusting slope and height.
+
+These are child-built thinking tools, not automatic solutions. Undo and Reset act on the current tool. Construction survives switching tools and reopening Help for the same question, and resets for a new question. Opening an aid before answering records an assisted attempt. Aids are unavailable during mock exams.
+
+The r1 wheel scrolls the workspace; Pen mode reserves touch gestures for drawing. The Back button remains visible. Visual-aid interaction tests run as part of `npm run check:browser`.
+
 Local help works without AI. On r1, **Ask the AI tutor** requests a selection among vetted thinking prompts using the official Rabbit bridge. The model cannot supply a scored answer or arbitrary displayed text. Invalid or late responses fall back to local help. Listen is a separate action; nothing auto-narrates.
 
 Rabbit speech is LLM-backed: the public SDK does not guarantee verbatim wording or remote cancellation. Browsers use speech synthesis when available. No API credentials are embedded. The app requests no child identity, microphone, camera, or account. See [research and SDK contract](docs/tutor-research.md).
