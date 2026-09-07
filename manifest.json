@@ -1,10 +1,17 @@
 {
-  "name": "Math Kangaroo Adventure",
-  "description": "Competition-accurate Math Kangaroo trainer with Grade 1-2 adaptive coaching and dual themes.",
-  "version": "2.0.0",
+  "name": "Kangaroo Studio",
+  "description": "Visual topic labs, adaptive missions, and Math Kangaroo practice exams for grades 1-12.",
+  "version": "3.0.0",
   "author": "Math Kangaroo Game",
   "category": "education",
-  "tags": ["math", "education", "game", "learning", "retro", "3d"],
+  "tags": [
+    "math",
+    "education",
+    "game",
+    "learning",
+    "retro",
+    "3d"
+  ],
   "screen_orientation": "portrait",
   "min_width": 240,
   "min_height": 282,
@@ -14,7 +21,11 @@
   ],
   "permissions": [],
   "hosting": {
-    "recommended": ["netlify", "github-pages", "vercel"],
+    "recommended": [
+      "netlify",
+      "github-pages",
+      "vercel"
+    ],
     "entry_point": "index.html"
   },
   "install_method": "qr_code"

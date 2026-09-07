@@ -26,6 +26,8 @@ export type GuidedStage = {
   body: (values: Record<string, LessonValue>) => string;
   derivation: (values: Record<string, LessonValue>) => string;
   visual: (values: Record<string, LessonValue>) => VisualAssetSpec;
+  /** Optional unsolved diagram for prediction checks. */
+  checkVisual?: (values: Record<string, LessonValue>) => VisualAssetSpec;
   controls?: GuidedControl[];
   prompt?: (values: Record<string, LessonValue>) => string;
   options?: (values: Record<string, LessonValue>) => [string, string, string];

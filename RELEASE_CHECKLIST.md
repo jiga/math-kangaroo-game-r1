@@ -2,6 +2,8 @@
 
 ## Before Merge / Push
 
+- `npm run typecheck`
+
 - `npm run validate`
 - `npm run test`
 - `npm run build`
@@ -27,6 +29,12 @@
 - explanations are deterministic and match the actual answer
 - no question has duplicate options
 - visual questions include usable alt text
+- semantically equivalent options cannot both appear as correct choices
+- exact arithmetic is not silently rounded
+- short missions span skills and treat assisted attempts separately
+- a miss gets a fresh transfer question; replay does not inflate evidence
+- guided checks hide derivations until a response, and controls preserve scroll
+- full exams reveal answers only after submission; skip/revisit and score history work
 
 ## Deployment Checks
 

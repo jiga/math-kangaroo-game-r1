@@ -1,6 +1,27 @@
-# Math Kangaroo R1 (Production Grade 1-12 Trainer)
+# Kangaroo Studio
 
-This build is optimized for Rabbit r1 and now supports Grade 1-12 competition preparation with banded content, guided lessons, official-format mocks, adaptive practice progression, deterministic coaching, and optional LLM enrichment.
+An interactive Math Kangaroo training companion for Grades 1-12, designed for Rabbit r1, phones, and desktops. Deploys as one static HTML file.
+
+[Open the studio](https://jiga.github.io/math-kangaroo-game-r1/)
+
+## Studio learning journey
+
+- **Mission:** six questions selected from new skills, due reviews, and skills needing practice. A miss schedules a fresh follow-up later in the mission. Feedback stays until the child continues.
+- **Explore:** reactive SVG diagrams, compact parameter buttons, prediction checks, and explanations revealed after a response. Listen is optional.
+- **Mock exam:** skip, revisit, and review before submitting. Answers and explanations appear after submission. Recent results are saved locally.
+- **My progress:** grade-specific evidence separates independent successes from help use. Remembered skills require different solved variants and successful retrieval on a later day. Replays and help cannot establish mastery.
+
+Top-five performance is a training aspiration. This app does not predict ranks or claim measured learning gains. Questions are original; the app is not affiliated with Math Kangaroo.
+
+## AI and device behavior
+
+Local help works without AI. On r1, **Ask the AI tutor** requests a selection among vetted thinking prompts using the official Rabbit bridge. The model cannot supply a scored answer or arbitrary displayed text. Invalid or late responses fall back to local help. Listen is a separate action; nothing auto-narrates.
+
+Rabbit speech is LLM-backed: the public SDK does not guarantee verbatim wording or remote cancellation. Browsers use speech synthesis when available. No API credentials are embedded. The app requests no child identity, microphone, camera, or account. See [research and SDK contract](docs/tutor-research.md).
+
+The app follows the visual viewport, including reduced r1 height. Long content scrolls through touch, keyboard, the rail, or Rabbit wheel events. The wheel always scrolls; parameter buttons reveal explicit +/- controls. Larger screens give diagrams more room.
+
+Training evidence uses `mk_training_v1` in SDK storage/localStorage. Grade, theme, explored topics, and recent mocks use `mk_studio_preferences_v1`. Existing `mk_profile_v2` data is preserved; its old totals cannot establish independent mastery because they lack help-use evidence. Progress belongs to the device/browser profile.
 
 Related docs:
 
@@ -14,13 +35,12 @@ Related docs:
 - Grade 1-2 question bank rebuilt from curriculum coverage map.
 - Grade 3-12 migrated onto the same banded architecture, with guided lessons and official mock sizing by band.
 - Contest fidelity by official Math Kangaroo band:
-  - 24 questions
+  - 24 questions for Grades 1-4; 30 for Grades 5-12
   - 75 minutes
   - 5 options per question
   - 3/4/5 point tiers
   - no wrong-answer penalty
-- Practice progression:
-  - `Diagnostic -> Mastery -> Mock`
+- Practice uses short adaptive missions. Mock exams start only when explicitly selected.
 - Visual puzzle support across the bands (SVG):
   - mazes
   - broken lines/perimeter
@@ -29,9 +49,9 @@ Related docs:
   - cube/cuboid visuals
   - symmetry
   - region compare
-- Deterministic per-skill coaching with optional LLM rewrite layer.
-- Voice queue synchronization to avoid stale/out-of-order speech.
-- Persistent on-device profile (`localStorage` key: `mk_profile_v2`).
+- Deterministic per-skill coaching with optional AI selection of vetted hints.
+- Explicit speech actions; no automatic question or feedback narration.
+- Persistent grade-specific evidence and due reviews.
 - Grade 3-12 now run through the same banded content pipeline as Grade 1-2, with guided lessons, adaptive practice, and official-format contest generation by band.
 
 ## Structure
@@ -82,7 +102,8 @@ scripts/
 
 ## Build and Validate
 
-- Install deps: `npm install`
+- Install deps: `npm ci`
+- Run all content tests and strict TypeScript checks: `npm run check`
 - Validate Grade 1-12 coverage and schema: `npm run validate`
 - Run tests: `npm run test`
 - Build single-file artifact: `npm run build`
@@ -95,6 +116,15 @@ Build writes:
 - `index.html` (compatibility copy)
 
 `dist/` is the publishable static site for GitHub Pages and other static hosts.
+
+With the local server running, browser verification uses:
+
+```bash
+CHECK_URL=http://127.0.0.1:8000 npm run check:browser
+CHECK_URL=http://127.0.0.1:8000 node scripts/check_studio_mcp.mjs
+```
+
+The first uses installed Google Chrome through Playwright. The second launches an isolated Chrome DevTools MCP 1.8.0 session. Screenshots and reports go to ignored `output/`. Browser tests do not replace physical r1 firmware/speaker testing.
 
 ## Local r1 Install Flow
 

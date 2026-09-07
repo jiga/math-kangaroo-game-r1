@@ -9,7 +9,7 @@ export class SeededRng {
 
   next(): number {
     this.state = (1664525 * this.state + 1013904223) >>> 0;
-    return this.state / 0xffffffff;
+    return this.state / 0x100000000;
   }
 
   int(min: number, max: number): number {

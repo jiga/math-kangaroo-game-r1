@@ -3,10 +3,16 @@ export class TTSQueue {
   private lastSpokenText = "";
   private lastSpokenAt = 0;
 
+  isAvailable(): boolean {
+    const plugin = (globalThis as unknown as { PluginMessageHandler?: { postMessage?: unknown } }).PluginMessageHandler;
+    return typeof plugin?.postMessage === "function" ||
+      (Boolean(globalThis.speechSynthesis) && typeof globalThis.SpeechSynthesisUtterance === "function");
+  }
+
   private normalize(text: string): string {
     return text
       .replace(/\b(Hint|Diagnosis|Speed|Example|Try this|Watch out|Fast move|Mini example):\s*/gi, "")
-      .replace(/\b(function|plugin|json|prompt|journal|system action|system|message|tool)\b/gi, "")
+      .replace(/\b(plugin|json|journal|system action)\b/gi, "")
       .replace(/\s{2,}/g, " ")
       .trim();
   }
@@ -18,6 +24,7 @@ export class TTSQueue {
 
   cancelAll(): void {
     this.generation += 1;
+    globalThis.speechSynthesis?.cancel();
   }
 
   speak(text: string): number {
@@ -37,7 +44,7 @@ export class TTSQueue {
           "Repeat only the child-facing words inside <say> tags, one time.",
           "Keep the same meaning and keep it short.",
           "Do not solve beyond what is said.",
-          "Do not add intros, outros, notes, or mention functions, prompts, tools, plugins, JSON, journal entries, or system actions.",
+          "Do not add intros, outros, notes, or mention app internals, plugins, JSON, journal entries, or system actions. Keep mathematical words such as function, input, and output when they appear in the text.",
           ` <say>${clean}</say>`
         ].join("\n");
 
@@ -57,7 +64,7 @@ export class TTSQueue {
     }
 
     const synth = globalThis.speechSynthesis;
-    if (!synth) return durationMs;
+    if (!synth || typeof globalThis.SpeechSynthesisUtterance !== "function") return 0;
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(clean);
     utterance.rate = 1.0;

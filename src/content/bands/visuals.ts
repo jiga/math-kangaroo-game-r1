@@ -483,20 +483,27 @@ export function setDiagramVisual(leftOnly: number, both: number, rightOnly: numb
 }
 
 export function systemGraphVisual(slope1: number, intercept1: number, slope2: number, intercept2: number, caption: string): VisualAssetSpec {
-  const toX = (x: number) => 44 + x * 16;
-  const toY = (y: number) => 88 - y * 10;
+  const ix = (intercept2 - intercept1) / (slope1 - slope2);
+  const iy = slope1 * ix + intercept1;
+  const minX = Math.min(-1, ix - 1);
+  const maxX = Math.max(9, ix + 1);
+  const minY = Math.min(-1, iy - 1);
+  const maxY = Math.max(7, intercept1, intercept2, iy + 1);
+  const toX = (x: number) => 30 + (x - minX) * 178 / (maxX - minX);
+  const toY = (y: number) => 102 - (y - minY) * 64 / (maxY - minY);
   const line = (m: number, b: number, opacity: number) => {
-    const x1 = 0;
-    const x2 = 9;
+    const x1 = minX;
+    const x2 = maxX;
     const y1 = m * x1 + b;
     const y2 = m * x2 + b;
     return `<line x1='${toX(x1)}' y1='${toY(y1)}' x2='${toX(x2)}' y2='${toY(y2)}' stroke='currentColor' stroke-width='2.2' stroke-opacity='${opacity}'/>`;
   };
-  const ix = (intercept2 - intercept1) / (slope1 - slope2);
-  const iy = slope1 * ix + intercept1;
+  // Clip in root coordinates so the app's descendant-svg sizing cannot resize the plot.
+  const clipId = `system-plot-${slope1}-${intercept1}-${slope2}-${intercept2}`;
+  const plot = `<defs><clipPath id='${clipId}' clipPathUnits='userSpaceOnUse'><rect x='30' y='38' width='178' height='64'/></clipPath></defs><g clip-path='url(#${clipId})'><line x1='30' y1='${toY(0)}' x2='208' y2='${toY(0)}' stroke='currentColor' stroke-width='2'/><line x1='${toX(0)}' y1='38' x2='${toX(0)}' y2='102' stroke='currentColor' stroke-width='2'/>${line(slope1, intercept1, 0.9)}${line(slope2, intercept2, 0.45)}${point(toX(ix), toY(iy), 5, 0.95)}</g>`;
   return {
     kind: "graph",
-    svg: svg(frame(`<line x1='30' y1='88' x2='206' y2='88' stroke='currentColor' stroke-width='2'/><line x1='44' y1='20' x2='44' y2='102' stroke='currentColor' stroke-width='2'/>${line(slope1, intercept1, 0.9)}${line(slope2, intercept2, 0.45)}${point(toX(ix), toY(iy), 5, 0.95)}${badge(20, 16, caption)}`)),
+    svg: svg(frame(`${plot}${badge(20, 16, caption)}`)),
     altText: `System graph with intersection at ${ix.toFixed(1)}, ${iy.toFixed(1)}`
   };
 }

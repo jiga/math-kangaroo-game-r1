@@ -1,6 +1,6 @@
-import type { Grade, SkillId } from "../domain/types";
+import type { Grade, SkillId, VisualAssetSpec } from "../domain/types";
 import type { GuidedTopic, GuidedTopicId, LessonValue } from "./guidedTypes";
-import { renderBrokenLine, renderCube, renderCuboid, renderMaze, renderPictograph, renderSymmetry, renderVenn } from "../render/visualQuestionRenderer";
+import { renderBrokenLine, renderCube, renderCuboid, renderMaze, renderPictograph, renderRegionCompare, renderSymmetry, renderVenn } from "../render/visualQuestionRenderer";
 import { GUIDED_TOPICS as G34_TOPICS } from "../content/bands/g34/guidedLessons";
 import { GUIDED_TOPICS as G56_TOPICS } from "../content/bands/g56/guidedLessons";
 import { GUIDED_TOPICS as G78_TOPICS } from "../content/bands/g78/guidedLessons";
@@ -10,10 +10,6 @@ import { estimateTextWidth, fitSingleLineText, svgSingleLineText } from "../rend
 
 export type { GuidedControl, GuidedStage, GuidedTopic, GuidedTopicId } from "./guidedTypes";
 
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function asNumber(values: Record<string, LessonValue>, key: string): number {
   return Number(values[key] ?? 0);
@@ -37,18 +33,27 @@ function formatMoney(cents: number): string {
 }
 
 function numberChoice(correct: number, offsets: [number, number, number]): { options: [string, string, string]; correctIndex: number } {
-  const numbers: number[] = [];
-  for (const offset of offsets) {
-    let candidate = clamp(correct + offset, 0, 99);
-    while (numbers.includes(candidate)) candidate += 1;
-    numbers.push(candidate);
-  }
-  const correctIndex = numbers.indexOf(correct);
-  if (correctIndex === -1) {
-    numbers[1] = correct;
-    return { options: [String(numbers[0]), String(numbers[1]), String(numbers[2])], correctIndex: 1 };
-  }
+  const correctIndex = Math.max(0, offsets.indexOf(0));
+  const seen = new Set([correct]);
+  const numbers = offsets.map((offset, index) => {
+    if (index === correctIndex) return correct;
+    let candidate = Math.max(0, correct + offset);
+    while (seen.has(candidate)) candidate++;
+    seen.add(candidate);
+    return candidate;
+  });
   return { options: [String(numbers[0]), String(numbers[1]), String(numbers[2])], correctIndex };
+}
+
+function positionChoices(position: number): [string, string, string] {
+  const previous = position === 1 ? 5 : position - 1;
+  const next = position === 5 ? 1 : position + 1;
+  return [ordinalLabel(previous), ordinalLabel(position), ordinalLabel(next)];
+}
+
+function likelihoodDerivation(blue: number, red: number): string {
+  const result = blue === red ? "both colors have the same chance" : `${blue > red ? "blue" : "red"} is more likely`;
+  return `${blue} blue and ${red} red: ${result}.`;
 }
 
 const SVG_HEAD =
@@ -107,7 +112,7 @@ function sequenceVisual(start: number, step: number, count: number, highlightInd
     .join("");
   return {
     kind: "lesson",
-    svg: svg(scene(`${badge(18, 14, `+${step}`)}${chips}`)),
+    svg: svg(scene(`${badge(18, 14, highlightIndex < 0 ? "counting pattern" : "from the left")}${chips}`)),
     altText: `Sequence starting at ${start} and growing by ${step}`
   };
 }
@@ -129,22 +134,22 @@ function placeValueVisual(aTens: number, aOnes: number, bTens: number, bOnes: nu
   };
 }
 
-function partWholeVisual(partA: number, partB: number): VisualAssetSpec {
+function partWholeVisual(partA: number, partB: number, hidePart = false): VisualAssetSpec {
   const total = partA + partB;
   const counters = (x: number, count: number, tone: number) =>
     Array.from({ length: count })
-      .map((_, index) => `<circle cx='${x + (index % 5) * 14}' cy='${52 + Math.floor(index / 5) * 14}' r='5' fill='currentColor' fill-opacity='${tone}'/>`)
+      .map((_, index) => `<circle cx='${x + (index % 5) * 11}' cy='${48 + Math.floor(index / 5) * 15}' r='4' fill='currentColor' fill-opacity='${tone}'/>`)
       .join("");
   return {
     kind: "lesson",
     svg: svg(
       scene(`
-        ${badge(22, 14, `part ${partA}`)}
-        ${badge(98, 14, `part ${partB}`)}
-        ${badge(170, 14, `whole ${total}`)}
-        ${counters(28, partA, 0.5)}
-        ${counters(104, partB, 0.7)}
-        ${counters(176, total, 0.88)}
+        ${badge(18, 14, `part ${partA}`)}
+        ${badge(90, 14, hidePart ? "part ?" : `part ${partB}`)}
+        ${badge(162, 14, `whole ${total}`)}
+        ${counters(24, partA, 0.5)}
+        ${counters(96, partB, 0.7)}
+        ${counters(168, total, 0.88)}
       `)
     ),
     altText: `Part whole model with parts ${partA} and ${partB} making ${total}`
@@ -153,49 +158,44 @@ function partWholeVisual(partA: number, partB: number): VisualAssetSpec {
 
 function balanceVisual(boxValue: number, extra: number): VisualAssetSpec {
   const total = boxValue + extra;
+  const counters = (count: number, x: number, cols: number, side: string) =>
+    Array.from({ length: count }, (_, i) => `<circle data-counter='${side}' cx='${x + (i % cols) * 14}' cy='${58 + Math.floor(i / cols) * 14}' r='5' fill='currentColor'/>`).join("");
   return {
     kind: "lesson",
-    svg: svg(
-      scene(`
-        <line x1='120' y1='22' x2='120' y2='42' stroke='currentColor' stroke-width='3'/>
-        <line x1='62' y1='42' x2='178' y2='42' stroke='currentColor' stroke-width='3'/>
-        <line x1='86' y1='42' x2='72' y2='82' stroke='currentColor' stroke-width='2.5'/>
-        <line x1='154' y1='42' x2='168' y2='82' stroke='currentColor' stroke-width='2.5'/>
-        <rect x='54' y='82' width='36' height='8' rx='4' fill='currentColor' fill-opacity='0.2'/>
-        <rect x='150' y='82' width='36' height='8' rx='4' fill='currentColor' fill-opacity='0.2'/>
-        <rect x='58' y='58' width='28' height='20' rx='6' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='1.5'/>
-        ${label(72, 71, "box", 9)}
-        ${Array.from({ length: total })
-          .map((_, index) => `<circle cx='${156 + (index % 4) * 12}' cy='${62 + Math.floor(index / 4) * 12}' r='4' fill='currentColor' fill-opacity='0.85'/>`)
-          .join("")}
-        ${badge(18, 14, `box = ${boxValue}`)}
-        ${badge(122, 14, `${boxValue} + ${extra} = ${total}`)}
-      `)
-    ),
-    altText: `Balance showing one box and ${total} counters`
+    svg: svg(scene(`
+      ${badge(18, 14, `box = ${boxValue}`)}${badge(132, 14, "equal weight")}
+      <path d='M 120 42 L 120 104 M 108 104 L 132 104 M 40 42 L 200 42' fill='none' stroke='currentColor' stroke-width='3'/>
+      <path d='M 36 42 L 30 94 L 108 94 L 102 42 M 144 42 L 138 94 L 212 94 L 206 42' fill='none' stroke='currentColor' stroke-width='1.5'/>
+      <rect x='40' y='62' width='28' height='28' rx='5' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='1.5'/>
+      ${label(54, 79, "box", 9)}
+      ${counters(extra, 80, 2, "left")}
+      ${counters(total, 150, 4, "right")}
+    `)),
+    altText: `Balanced scale: a box worth ${boxValue} counters plus ${extra} extra counters equals ${total} counters`
   };
 }
 
 function numberLineVisual(start: number, jump: number, direction: string): VisualAssetSpec {
   const delta = direction === "left" ? -jump : jump;
   const end = start + delta;
-  const low = Math.min(start, end) - 1;
+  const low = Math.max(0, Math.min(start, end) - 1);
   const high = Math.max(start, end) + 1;
+  const spacing = 176 / (high - low);
   const ticks = Array.from({ length: high - low + 1 }, (_, index) => low + index)
     .map((value, index) => {
-      const x = 32 + index * 30;
+      const x = 32 + index * spacing;
       return `<line x1='${x}' y1='68' x2='${x}' y2='80' stroke='currentColor' stroke-width='2'/><text x='${x}' y='94' text-anchor='middle' font-size='10' fill='currentColor'>${value}</text>`;
     })
     .join("");
-  const startX = 32 + (start - low) * 30;
-  const endX = 32 + (end - low) * 30;
+  const startX = 32 + (start - low) * spacing;
+  const endX = 32 + (end - low) * spacing;
   const arrowHead = direction === "left" ? `${endX + 2},52 ${endX + 12},46 ${endX + 12},58` : `${endX - 2},52 ${endX - 12},46 ${endX - 12},58`;
   return {
     kind: "lesson",
     svg: svg(
       scene(`
         ${badge(18, 14, `${start} ${direction === "left" ? "-" : "+"} ${jump}`)}
-        ${badge(146, 14, `land ${end}`)}
+        ${badge(146, 14, `move ${direction}`)}
         <line x1='32' y1='74' x2='208' y2='74' stroke='currentColor' stroke-width='2.5'/>
         ${ticks}
         <line x1='${startX}' y1='52' x2='${endX}' y2='52' stroke='currentColor' stroke-width='3'/>
@@ -209,13 +209,13 @@ function numberLineVisual(start: number, jump: number, direction: string): Visua
 function fractionVisual(parts: number, shaded: number): VisualAssetSpec {
   const cells = Array.from({ length: parts })
     .map((_, index) => {
-      const x = 30 + index * 24;
-      return `<rect x='${x}' y='44' width='20' height='36' rx='6' fill='currentColor' fill-opacity='${index < shaded ? 0.72 : 0.08}' stroke='currentColor' stroke-width='1.5'/>`;
+      const x = 32 + index * (176 / parts);
+      return `<rect x='${x}' y='44' width='${176 / parts}' height='36' fill='currentColor' fill-opacity='${index < shaded ? 0.72 : 0.08}' stroke='currentColor' stroke-width='1.5'/>`;
     })
     .join("");
   return {
     kind: "lesson",
-    svg: svg(scene(`${badge(18, 14, `${shaded}/${parts}`)}${cells}`)),
+    svg: svg(scene(`${badge(18, 14, `${shaded} shaded`)}${cells}`)),
     altText: `Bar model with ${shaded} of ${parts} equal parts shaded`
   };
 }
@@ -280,13 +280,12 @@ function moneyVisual(pennies: number, nickels: number, dimes: number): VisualAss
     ...Array.from({ length: dimes }, () => ["10", "d"])
   ];
   const nodes = coins
-    .slice(0, 9)
-    .map(([labelText], index) => `<circle cx='${36 + (index % 3) * 34}' cy='${48 + Math.floor(index / 3) * 24}' r='11' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='1.5'/><text x='${36 + (index % 3) * 34}' y='${52 + Math.floor(index / 3) * 24}' text-anchor='middle' font-size='9' font-weight='700' fill='currentColor'>${labelText}</text>`)
+    .map(([labelText], index) => `<circle cx='${36 + (index % 5) * 38}' cy='${48 + Math.floor(index / 5) * 32}' r='11' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='1.5'/><text x='${36 + (index % 5) * 38}' y='${52 + Math.floor(index / 5) * 32}' text-anchor='middle' font-size='9' font-weight='700' fill='currentColor'>${labelText}</text>`)
     .join("");
   return {
     kind: "lesson",
-    svg: svg(scene(`${badge(18, 14, formatMoney(total))}${badge(110, 14, `${dimes}d ${nickels}n ${pennies}p`)}${nodes}`)),
-    altText: `Coins totaling ${total} cents`
+    svg: svg(scene(`${badge(18, 14, "coin values (c)")}${badge(126, 14, `${dimes}d ${nickels}n ${pennies}p`)}${nodes}`)),
+    altText: `${pennies} pennies, ${nickels} nickels and ${dimes} dimes totaling ${total} cents`
   };
 }
 
@@ -320,58 +319,48 @@ function shapeVisual(sides: number): VisualAssetSpec {
   };
   return {
     kind: "lesson",
-    svg: svg(scene(`${badge(18, 14, `${sides} sides`)}<polygon points='${polygonPoints[sides] || polygonPoints[4]}' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>`)),
+    svg: svg(scene(`${badge(18, 14, "count the sides")}<polygon points='${polygonPoints[sides] || polygonPoints[4]}' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>`)),
     altText: `Polygon with ${sides} sides`
   };
 }
 
 function likelihoodVisual(blue: number, red: number): VisualAssetSpec {
-  const marbles = [
-    ...Array.from({ length: blue }, () => "blue"),
-    ...Array.from({ length: red }, () => "red")
-  ];
-  const nodes = marbles
-    .map((color, index) => `<circle cx='${44 + (index % 4) * 28}' cy='${46 + Math.floor(index / 4) * 24}' r='8' fill='currentColor' fill-opacity='${color === "blue" ? 0.85 : 0.3}' stroke='currentColor' stroke-width='1.4'/>`)
-    .join("");
+  const marbles = [...Array.from({ length: blue }, () => "blue"), ...Array.from({ length: red }, () => "red")];
+  const nodes = marbles.map((color, i) => {
+    const x = 64 + (i % 4) * 36, y = 46 + Math.floor(i / 4) * 24;
+    return `<circle data-marble='${color}' cx='${x}' cy='${y}' r='9' fill='${color === "blue" ? "#2467b2" : "#ad303f"}' stroke='currentColor' stroke-width='1.4'/>${svgSingleLineText(x, y + 3, color === "blue" ? "B" : "R", { size: 9, fill: "#ffffff" })}`;
+  }).join("");
   return {
     kind: "lesson",
-    svg: svg(scene(`${badge(18, 14, `blue ${blue}`)}${badge(108, 14, `red ${red}`)}${nodes}`)),
-    altText: `Bag with ${blue} blue and ${red} red marbles`
+    svg: svg(scene(`${badge(18, 14, `B blue ${blue}`)}${badge(126, 14, `R red ${red}`)}${nodes}`)),
+    altText: `Bag with ${blue} blue and ${red} red marbles; each marble has the same chance of being picked`
   };
 }
 
 function regionVisual(left: number, right: number): VisualAssetSpec {
-  const widthA = left * 10;
-  const widthB = right * 10;
-  return {
-    kind: "region_compare",
-    svg: svg(scene(`<rect x='34' y='40' width='${widthA}' height='34' fill='currentColor' fill-opacity='0.14' stroke='currentColor' stroke-width='2'/><rect x='132' y='40' width='${widthB}' height='34' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2'/><text x='${34 + widthA / 2}' y='61' text-anchor='middle' font-size='11' font-weight='700' fill='currentColor'>A</text><text x='${132 + widthB / 2}' y='61' text-anchor='middle' font-size='11' font-weight='700' fill='currentColor'>B</text>`)),
-    altText: `Region A width ${left} units and region B width ${right} units`
-  };
+  const asset = renderRegionCompare(left, right);
+  return { ...asset, svg: asset.svg.replaceAll("currentColor", GUIDED_SVG_INK) };
 }
 
 function thermometerVisual(cold: number, warm: number): VisualAssetSpec {
-  const coldHeight = 18 + Math.max(0, cold + 5) * 4;
-  const warmHeight = 18 + Math.max(0, warm + 5) * 4;
+  const thermometer = (x: number, value: number, name: string) => {
+    const top = 80 - (value + 2) * (46 / 16);
+    return `
+      ${badge(x - 2, 14, name)}
+      <rect x='${x}' y='32' width='18' height='54' rx='9' fill='none' stroke='currentColor' stroke-width='2'/>
+      <rect data-temperature='${value}' x='${x + 5}' y='${top}' width='8' height='${88 - top}' rx='4' fill='#ef7272'/>
+      <circle cx='${x + 9}' cy='88' r='9' fill='#ef7272' stroke='currentColor' stroke-width='2'/>
+      ${[-2, 6, 14].map((tick) => {
+        const y = 80 - (tick + 2) * (46 / 16);
+        return `<line x1='${x + 22}' y1='${y}' x2='${x + 27}' y2='${y}' stroke='currentColor'/>${label(x + 38, y + 3, String(tick), 8)}`;
+      }).join("")}
+      ${label(x + 9, 108, `${value}°`, 10)}
+    `;
+  };
   return {
     kind: "lesson",
-    svg: svg(
-      scene(`
-        <g transform='translate(54 26)'>
-          <rect x='0' y='0' width='22' height='60' rx='11' fill='none' stroke='currentColor' stroke-width='2'/>
-          <circle cx='11' cy='88' r='10' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='2'/>
-          <rect x='6' y='${84 - coldHeight}' width='10' height='${coldHeight}' rx='5' fill='currentColor' fill-opacity='0.75'/>
-          <text x='11' y='106' text-anchor='middle' font-size='10' font-weight='700' fill='currentColor'>${cold}°</text>
-        </g>
-        <g transform='translate(144 26)'>
-          <rect x='0' y='0' width='22' height='60' rx='11' fill='none' stroke='currentColor' stroke-width='2'/>
-          <circle cx='11' cy='88' r='10' fill='currentColor' fill-opacity='0.18' stroke='currentColor' stroke-width='2'/>
-          <rect x='6' y='${84 - warmHeight}' width='10' height='${warmHeight}' rx='5' fill='currentColor' fill-opacity='0.75'/>
-          <text x='11' y='106' text-anchor='middle' font-size='10' font-weight='700' fill='currentColor'>${warm}°</text>
-        </g>
-      `)
-    ),
-    altText: `Two thermometers showing ${cold} degrees and ${warm} degrees`
+    svg: svg(scene(`${thermometer(54, cold, "A")}${thermometer(144, warm, "B")}`)),
+    altText: `Two thermometers on the same scale: A ${cold} degrees and B ${warm} degrees`
   };
 }
 
@@ -418,20 +407,7 @@ function rotationVisual(turns: number): VisualAssetSpec {
 }
 
 function chanceWordVisual(mode: "equal" | "certain" | "impossible"): VisualAssetSpec {
-  const chips =
-    mode === "equal"
-      ? `<circle cx='86' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/><circle cx='120' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/>`
-      : mode === "certain"
-        ? Array.from({ length: 4 })
-            .map((_, index) => `<circle cx='${72 + index * 24}' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/>`)
-            .join("")
-        : `<circle cx='72' cy='66' r='12' fill='currentColor' fill-opacity='0.72'/><circle cx='96' cy='66' r='12' fill='currentColor' fill-opacity='0.16'/><circle cx='120' cy='66' r='12' fill='currentColor' fill-opacity='0.16'/><circle cx='144' cy='66' r='12' fill='currentColor' fill-opacity='0.16'/>`;
-  const label = mode === "equal" ? "same number each" : mode === "certain" ? "all outcomes match" : "no matching outcome";
-  return {
-    kind: "lesson",
-    svg: svg(scene(`${badge(22, 14, label)}${chips}`)),
-    altText: `Chance word visual for ${mode}`
-  };
+  return likelihoodVisual(mode === "certain" ? 4 : mode === "equal" ? 2 : 0, mode === "certain" ? 0 : mode === "equal" ? 2 : 4);
 }
 
 function measureObjectVisual(kind: "length" | "weight" | "capacity"): VisualAssetSpec {
@@ -483,7 +459,7 @@ const G12_TOPICS: GuidedTopic[] = [
         derivation: (v) => {
           const start = asNumber(v, "start");
           const step = asNumber(v, "step");
-          return `${start}, ${start + step}, ${start + step * 2}, ${start + step * 3}, ${start + step * 4}`;
+          return Array.from({ length: asNumber(v, "count") }, (_, i) => start + step * i).join(", ");
         },
         visual: (v) => sequenceVisual(asNumber(v, "start"), asNumber(v, "step"), asNumber(v, "count")),
         controls: [
@@ -496,7 +472,7 @@ const G12_TOPICS: GuidedTopic[] = [
       {
         id: "rule-check",
         title: "Name The Jump Rule",
-        body: (v) => `Math Kangaroo for Grades 1-2 wants one clear rule. Say the jump instead of extending the sequence.`,
+        body: () => `Compare both jumps. Name the rule that matches each jump.`,
         derivation: (v) => `Each jump changes by ${asNumber(v, "step")}.`,
         visual: (v) => sequenceVisual(asNumber(v, "start"), asNumber(v, "step"), asNumber(v, "count")),
         controls: [
@@ -509,7 +485,7 @@ const G12_TOPICS: GuidedTopic[] = [
         },
         options: (v) => {
           const step = asNumber(v, "step");
-          return [`add ${Math.max(1, step - 1)}`, `add ${step}`, `subtract ${step}`];
+          return [`add ${step + 1}`, `add ${step}`, `subtract ${step}`];
         },
         correctIndex: () => 1,
         success: (v) => `Correct. The pattern uses the same jump: add ${asNumber(v, "step")}.`,
@@ -523,13 +499,8 @@ const G12_TOPICS: GuidedTopic[] = [
         derivation: (v) => `${ordinalLabel(asNumber(v, "ordinal"))} from the left is highlighted.`,
         visual: (v) => sequenceVisual(1, 1, 5, asNumber(v, "ordinal") - 1),
         controls: [{ kind: "range", key: "ordinal", label: "place", min: 1, max: 5 }],
-        prompt: (v) => `Which position is highlighted?`,
-        options: (v) => {
-          const correct = ordinalLabel(asNumber(v, "ordinal"));
-          const prev = ordinalLabel(Math.max(1, asNumber(v, "ordinal") - 1));
-          const next = ordinalLabel(Math.min(5, asNumber(v, "ordinal") + 1));
-          return [prev, correct, next];
-        },
+        prompt: () => `Which position from the left is highlighted?`,
+        options: (v) => positionChoices(asNumber(v, "ordinal")),
         correctIndex: () => 1,
         success: (v) => `Correct. ${ordinalLabel(asNumber(v, "ordinal"))} tells the position.`,
         retry: (v) => `Count the places from the left: first, second, third...`,
@@ -567,7 +538,9 @@ const G12_TOPICS: GuidedTopic[] = [
         id: "which",
         title: "Which Is Greater?",
         body: () => `Use tens first. If the tens match, then use the ones.`,
-        derivation: (v) => `Ask: which number has more tens?`,
+        derivation: (v) => asNumber(v, "aTens") === asNumber(v, "bTens")
+          ? `The tens match. Compare ${asNumber(v, "aOnes")} ones with ${asNumber(v, "bOnes")} ones.`
+          : `Compare ${asNumber(v, "aTens")} tens with ${asNumber(v, "bTens")} tens.`,
         visual: (v) => placeValueVisual(asNumber(v, "aTens"), asNumber(v, "aOnes"), asNumber(v, "bTens"), asNumber(v, "bOnes")),
         controls: [
           { kind: "range", key: "aTens", label: "A tens", min: 1, max: 7 },
@@ -600,7 +573,7 @@ const G12_TOPICS: GuidedTopic[] = [
         derivation: (v) => `${asNumber(v, "aTens")} in the tens place means ${asNumber(v, "aTens") * 10}.`,
         visual: (v) => placeValueVisual(asNumber(v, "aTens"), asNumber(v, "aOnes"), asNumber(v, "bTens"), asNumber(v, "bOnes")),
         controls: [{ kind: "range", key: "aTens", label: "tens digit", min: 1, max: 7 }],
-        prompt: (v) => `What is the value of the tens digit?`,
+        prompt: () => `What is the value of the tens digit in A?`,
         options: (v) => {
           const correct = asNumber(v, "aTens") * 10;
           return numberChoice(correct, [-10, 0, 10]).options;
@@ -635,7 +608,7 @@ const G12_TOPICS: GuidedTopic[] = [
         title: "Find The Missing Part",
         body: () => `For a missing part, take the whole and subtract the part you know.`,
         derivation: (v) => `${asNumber(v, "partA") + asNumber(v, "partB")} - ${asNumber(v, "partA")} = ${asNumber(v, "partB")}`,
-        visual: (v) => partWholeVisual(asNumber(v, "partA"), asNumber(v, "partB")),
+        visual: (v) => partWholeVisual(asNumber(v, "partA"), asNumber(v, "partB"), true),
         controls: [{ kind: "range", key: "partA", label: "known part", min: 1, max: 8 }],
         prompt: (v) => {
           const whole = asNumber(v, "partA") + asNumber(v, "partB");
@@ -679,7 +652,7 @@ const G12_TOPICS: GuidedTopic[] = [
         derivation: (v) => `${asNumber(v, "lineStart")} ${asString(v, "direction") === "left" ? "-" : "+"} ${asNumber(v, "jump")}`,
         visual: (v) => numberLineVisual(asNumber(v, "lineStart"), asNumber(v, "jump"), asString(v, "direction")),
         controls: [
-          { kind: "range", key: "lineStart", label: "start", min: 1, max: 10 },
+          { kind: "range", key: "lineStart", label: "start", min: 4, max: 10 },
           { kind: "range", key: "jump", label: "jump", min: 1, max: 4 },
           {
             kind: "toggle",
@@ -721,8 +694,8 @@ const G12_TOPICS: GuidedTopic[] = [
         derivation: (v) => `${ordinalLabel(asNumber(v, "rowPlace"))} from the left is marked.`,
         visual: (v) => sequenceVisual(1, 1, 5, asNumber(v, "rowPlace") - 1),
         controls: [{ kind: "range", key: "rowPlace", label: "place", min: 1, max: 5 }],
-        prompt: (v) => `Which position is marked?`,
-        options: (v) => [ordinalLabel(Math.max(1, asNumber(v, "rowPlace") - 1)), ordinalLabel(asNumber(v, "rowPlace")), ordinalLabel(Math.min(5, asNumber(v, "rowPlace") + 1))],
+        prompt: () => `Which position from the left is marked?`,
+        options: (v) => positionChoices(asNumber(v, "rowPlace")),
         correctIndex: () => 1,
         success: (v) => `Correct. ${ordinalLabel(asNumber(v, "rowPlace"))} tells the place.`,
         retry: () => `Count places from the side named in the clue.`
@@ -751,8 +724,8 @@ const G12_TOPICS: GuidedTopic[] = [
       {
         id: "fraction-word",
         title: "Choose The Fraction Word",
-        body: () => `Match the denominator to the number of equal parts.`,
-        derivation: (v) => `Four equal parts means quarter. Three equal parts means third.`,
+        body: () => `Count the equal parts to choose the fraction word.`,
+        derivation: (v) => `One of ${asNumber(v, "parts")} equal parts is one ${asNumber(v, "parts") === 2 ? "half" : asNumber(v, "parts") === 3 ? "third" : "quarter"}.`,
         visual: (v) => fractionVisual(asNumber(v, "parts"), 1),
         controls: [{ kind: "range", key: "parts", label: "parts", min: 2, max: 4 }],
         prompt: (v) => `One part of ${asNumber(v, "parts")} equal pieces is called...`,
@@ -763,7 +736,7 @@ const G12_TOPICS: GuidedTopic[] = [
           return ["one half", "one quarter", "one third"];
         },
         correctIndex: (v) => (asNumber(v, "parts") === 2 ? 1 : asNumber(v, "parts") === 3 ? 1 : 1),
-        success: (v) => `Correct. The denominator tells how many equal parts make the whole.`,
+        success: () => `Correct. The number of equal parts tells you the fraction word.`,
         retry: () => `Read the number of equal parts first.`
       },
       {
@@ -819,8 +792,8 @@ const G12_TOPICS: GuidedTopic[] = [
       {
         id: "likely",
         title: "More Means More Likely",
-        body: () => `Likelihood compares counts. More blue than red means blue is more likely.`,
-        derivation: (v) => `${asNumber(v, "blue")} blue and ${asNumber(v, "red")} red means blue is more likely.`,
+        body: () => `Each marble has the same chance of being picked. The color with more marbles is more likely.`,
+        derivation: (v) => likelihoodDerivation(asNumber(v, "blue"), asNumber(v, "red")),
         visual: (v) => likelihoodVisual(asNumber(v, "blue"), asNumber(v, "red")),
         controls: [
           { kind: "range", key: "blue", label: "blue", min: 1, max: 6 },
@@ -914,13 +887,13 @@ const G12_TOPICS: GuidedTopic[] = [
           { kind: "range", key: "tempWarm", label: "temp B", min: 2, max: 14 }
         ],
         prompt: (v) => `Which temperature is warmer?`,
-        options: (v) => [`${asNumber(v, "tempCold")}°`, `${asNumber(v, "tempWarm")}°`, "same"],
+        options: (v) => [`A (${asNumber(v, "tempCold")}°)`, `B (${asNumber(v, "tempWarm")}°)`, "same"],
         correctIndex: (v) => {
           const a = asNumber(v, "tempCold");
           const b = asNumber(v, "tempWarm");
           return a === b ? 2 : a > b ? 0 : 1;
         },
-        success: () => `Correct. The greater temperature is warmer.`,
+        success: (v) => asNumber(v, "tempCold") === asNumber(v, "tempWarm") ? "Correct. Both temperatures are the same." : "Correct. The greater temperature is warmer.",
         retry: () => `Compare the two numbers. The bigger one is warmer, and equal means same.`
       },
       {
@@ -934,7 +907,7 @@ const G12_TOPICS: GuidedTopic[] = [
           { kind: "range", key: "nickels", label: "nickels", min: 0, max: 3 },
           { kind: "range", key: "dimes", label: "dimes", min: 0, max: 3 }
         ],
-        prompt: (v) => `What is the total value?`,
+        prompt: () => `What is the total value in cents?`,
         options: (v) => numberChoice(asNumber(v, "dimes") * 10 + asNumber(v, "nickels") * 5 + asNumber(v, "pennies"), [-1, 0, 5]).options,
         correctIndex: (v) => numberChoice(asNumber(v, "dimes") * 10 + asNumber(v, "nickels") * 5 + asNumber(v, "pennies"), [-1, 0, 5]).correctIndex,
         success: () => `Correct. Use coin values, not coin count.`,
@@ -964,7 +937,7 @@ const G12_TOPICS: GuidedTopic[] = [
       {
         id: "calendar",
         title: "Move Forward By Days",
-        body: () => `On a calendar, move one day at a time and keep your starting day.`,
+        body: () => `Start on the given date. Each move goes to the next day; do not count the starting day as a move.`,
         derivation: (v) => `${asNumber(v, "day")} plus ${asNumber(v, "move")} days lands on ${asNumber(v, "day") + asNumber(v, "move")}.`,
         visual: (v) => calendarVisual(asNumber(v, "day"), asNumber(v, "move")),
         controls: [
@@ -975,7 +948,7 @@ const G12_TOPICS: GuidedTopic[] = [
         options: (v) => numberChoice(asNumber(v, "day") + asNumber(v, "move"), [-1, 0, 1]).options,
         correctIndex: (v) => numberChoice(asNumber(v, "day") + asNumber(v, "move"), [-1, 0, 1]).correctIndex,
         success: () => `Correct. Move forward one day at a time.`,
-        retry: () => `Keep the starting day and count forward.`
+        retry: () => `The first move lands on the next day. Count the moves, not the starting day.`
       },
       {
         id: "calendar-cycles",
@@ -1125,7 +1098,7 @@ const G12_TOPICS: GuidedTopic[] = [
       {
         id: "chance-words",
         title: "Use The Chance Word",
-        body: () => `Certain means always. Impossible means zero chance. Equal counts mean equally likely.`,
+        body: () => `Each marble has the same chance of being picked. All blue means blue is certain; no blue means blue is impossible.`,
         derivation: (v) =>
           asString(v, "chanceMode") === "certain"
             ? "All outcomes match, so the event is certain."
@@ -1159,8 +1132,8 @@ const G12_TOPICS: GuidedTopic[] = [
       {
         id: "more-likely",
         title: "More Data Means More Likely",
-        body: () => `If there are more blue outcomes than red, blue is more likely.`,
-        derivation: (v) => `${asNumber(v, "blueBag")} blue vs ${asNumber(v, "redBag")} red.`,
+        body: () => `Each marble has the same chance of being picked. Compare the counts of the two colors.`,
+        derivation: (v) => likelihoodDerivation(asNumber(v, "blueBag"), asNumber(v, "redBag")),
         visual: (v) => likelihoodVisual(asNumber(v, "blueBag"), asNumber(v, "redBag")),
         controls: [
           { kind: "range", key: "blueBag", label: "blue", min: 1, max: 6 },
@@ -1185,35 +1158,38 @@ const G12_TOPICS: GuidedTopic[] = [
       {
         id: "broken-line",
         title: "Add Every Segment Once",
-        body: () => `Perimeter and broken-line questions work by tracing every segment one time.`,
+        body: () => `Follow this open path from one end to the other. Add each segment once.`,
         derivation: (v) => `${asNumber(v, "sideA")} + ${asNumber(v, "sideB")} + ${asNumber(v, "sideA")} + ${asNumber(v, "sideB")} = ${(asNumber(v, "sideA") + asNumber(v, "sideB")) * 2}`,
         visual: (v) => renderBrokenLine([asNumber(v, "sideA"), asNumber(v, "sideB"), asNumber(v, "sideA"), asNumber(v, "sideB")]),
         controls: [
-          { kind: "range", key: "sideA", label: "width", min: 2, max: 6 },
-          { kind: "range", key: "sideB", label: "height", min: 2, max: 6 }
+          { kind: "range", key: "sideA", label: "across length", min: 2, max: 6 },
+          { kind: "range", key: "sideB", label: "up/down length", min: 2, max: 6 }
         ]
       },
       {
         id: "perimeter-check",
         title: "Find The Total Length",
         body: () => `Do not count the same side twice unless it appears twice in the path.`,
-        derivation: (v) => `Perimeter is the full walk around the edge.`,
+        derivation: (v) => `${asNumber(v, "sideA")} + ${asNumber(v, "sideB")} + ${asNumber(v, "sideA")} + ${asNumber(v, "sideB")} = ${(asNumber(v, "sideA") + asNumber(v, "sideB")) * 2}. This is an open path, not a closed perimeter.`,
         visual: (v) => renderBrokenLine([asNumber(v, "sideA"), asNumber(v, "sideB"), asNumber(v, "sideA"), asNumber(v, "sideB")]),
-        prompt: (v) => `What is the total edge length?`,
+        prompt: () => `What is the total length of the broken line?`,
         options: (v) => numberChoice((asNumber(v, "sideA") + asNumber(v, "sideB")) * 2, [-2, 0, 2]).options,
         correctIndex: (v) => numberChoice((asNumber(v, "sideA") + asNumber(v, "sideB")) * 2, [-2, 0, 2]).correctIndex,
-        success: () => `Correct. Walk the whole boundary once.`,
-        retry: () => `Add every side you would trace around the shape.`
+        success: () => `Correct. Follow the whole path and add each segment once.`,
+        retry: () => `Add all four labeled lengths from one end to the other.`
       },
       {
         id: "regions",
         title: "Compare Equal Units",
-        body: () => `Region size is decided by equal units, not by which picture looks wider.`,
-        derivation: (v) => `Region B is wider here because it has more equal units.`,
+        body: () => `Each little square has the same area. Count the squares in A and in B.`,
+        derivation: (v) => {
+          const a = asNumber(v, "regionA"), b = asNumber(v, "regionB");
+          return a === b ? `Both regions have ${3 * a} equal squares, so their areas are equal.` : `A has ${3 * a} equal squares and B has ${3 * b}. Region ${a > b ? "A" : "B"} has more area.`;
+        },
         visual: (v) => regionVisual(asNumber(v, "regionA"), asNumber(v, "regionB")),
         controls: [
-          { kind: "range", key: "regionA", label: "A units", min: 3, max: 7 },
-          { kind: "range", key: "regionB", label: "B units", min: 3, max: 7 }
+          { kind: "range", key: "regionA", label: "A columns", min: 3, max: 7 },
+          { kind: "range", key: "regionB", label: "B columns", min: 3, max: 7 }
         ],
         prompt: (v) => `Which region has more equal units?`,
         options: () => ["A", "Same", "B"],

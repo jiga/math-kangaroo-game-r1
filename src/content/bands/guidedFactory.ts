@@ -1,4 +1,8 @@
 import type { BandCoverageMap } from "./common";
+import { rationalText, textDistractors } from "./common";
+import type { VisualAssetSpec } from "../../domain/types";
+import { SeededRng, shuffled } from "../g1g2/helpers";
+import { svgSingleLineText } from "../../render/svgText";
 import type { GuidedControl, GuidedStage, GuidedTopic, LessonValue } from "../../learn/guidedTypes";
 import {
   angleVisual,
@@ -28,8 +32,7 @@ import {
   similarityVisual,
   systemGraphVisual,
   transformGraphVisual,
-  treeVisual,
-  trigTriangleVisual
+  treeVisual
 } from "./visuals";
 
 function asNumber(values: Record<string, LessonValue>, key: string, fallback = 0): number {
@@ -60,13 +63,63 @@ function numberOptions(correct: number, a: number, b: number): [string, string, 
 }
 
 function textOptions(correct: string, a: string, b: string): [string, string, string] {
-  const out = [correct];
-  for (const candidate of [a, b, "not enough info", "a different choice"]) {
-    if (!out.includes(candidate)) out.push(candidate);
-    if (out.length === 3) break;
+  const distractors = textDistractors(correct, [a, b]);
+  return [correct, distractors[0], distractors[1]];
+}
+
+function exactHypotenuse(a: number, b: number): string {
+  const squared = a * a + b * b;
+  const root = Math.sqrt(squared);
+  return Number.isInteger(root) ? String(root) : `√${squared}`;
+}
+
+function rightTriangleLessonVisual(adjacent: number, opposite: number): VisualAssetSpec {
+  const scale = Math.min(86 / adjacent, 52 / opposite);
+  const right = 78 + adjacent * scale;
+  const top = 88 - opposite * scale;
+  return {
+    kind: "geometry",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><polygon points="78,88 78,${top} ${right},88" fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="2"/><path d="M78 79h9v9" fill="none" stroke="currentColor"/>${svgSingleLineText((78 + right) / 2, 105, `adj ${adjacent}`, { size: 11, maxWidth: 80 })}${svgSingleLineText(40, (88 + top) / 2, `opp ${opposite}`, { size: 11, maxWidth: 64 })}${svgSingleLineText(right + 18, top + 10, "hyp c", { size: 11, maxWidth: 60 })}</svg>`,
+    altText: `Right triangle with adjacent side ${adjacent}, opposite side ${opposite}, and unknown hypotenuse c`
+  };
+}
+
+function systemLessonVisual(m1: number, b1: number, m2: number, b2: number, caption: string): VisualAssetSpec {
+  return {
+    ...systemGraphVisual(m1, b1, m2, b2, caption),
+    altText: `Graphs of y = ${m1}x + ${b1} and y = ${m2}x + ${b2}. Their meeting point satisfies both equations.`
+  };
+}
+
+function givenInputsVisual(first: string, second: string, target: string): VisualAssetSpec {
+  return {
+    kind: "formula",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><rect x="24" y="16" width="192" height="58" rx="8" fill="currentColor" fill-opacity="0.06" stroke="currentColor"/>${svgSingleLineText(120, 39, first, { size: 13, maxWidth: 176 })}${svgSingleLineText(120, 62, second, { size: 13, maxWidth: 176 })}<path d="M120 75v10m-4-4 4 4 4-4" fill="none" stroke="currentColor"/>${svgSingleLineText(120, 106, target, { size: 12, maxWidth: 190 })}</svg>`,
+    altText: `Given ${first}; ${second}. Find ${target}`
+  };
+}
+
+function quadraticCheckVisual(a: number, h: number, k: number): VisualAssetSpec {
+  const xAt = (x: number) => 28 + x * 18;
+  const yAt = (y: number) => 92 - y * 6;
+  let path = "";
+  let drawing = false;
+  for (let index = 0; index <= 200; index += 1) {
+    const x = index / 20;
+    const y = a * (x - h) ** 2 + k;
+    if (y < 0 || y > 12) {
+      drawing = false;
+      continue;
+    }
+    path += `${drawing ? "L" : "M"}${xAt(x)},${yAt(y)} `;
+    drawing = true;
   }
-  while (out.length < 3) out.push(`choice ${out.length + 1}`);
-  return out as [string, string, string];
+  const ticks = Array.from({ length: 11 }, (_, x) => `<path d="M${xAt(x)} 92v4" stroke="currentColor"/>${svgSingleLineText(xAt(x), 109, String(x), { size: 9, maxWidth: 16 })}`).join("");
+  return {
+    kind: "graph",
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><path d="M28 18v74h186" fill="none" stroke="currentColor" stroke-width="1.5"/>${ticks}<path d="${path}" fill="none" stroke="currentColor" stroke-width="2"/>${svgSingleLineText(225, 95, "x", { size: 11, maxWidth: 12 })}${svgSingleLineText(18, 14, "y", { size: 11, maxWidth: 12 })}</svg>`,
+    altText: "Quadratic graph with x-axis labels from zero to ten. Locate the turning point; it is not marked."
+  };
 }
 
 function range(key: string, label: string, min: number, max: number, step = 1, formatter?: (value: LessonValue) => string): GuidedControl {
@@ -260,7 +313,7 @@ function buildFractionShareStages(title: string, summary: string): TopicLessonCo
         id: "check",
         title: "Quick Check",
         body: () => `Turn one part into the whole set.`,
-        derivation: (values) => `${asNumber(values, "parts", 4)} × ${asNumber(values, "unit", 3)} = ${asNumber(values, "parts", 4) * asNumber(values, "unit", 3)}`,
+        derivation: (values) => `${asNumber(values, "parts", 4)} × ${asNumber(values, "unit", 3)} = ?`,
         visual: (values) => fractionBarVisual(asNumber(values, "parts", 4), asNumber(values, "shaded", 2), "share to whole"),
         prompt: (values) => `If one part has ${asNumber(values, "unit", 3)} objects and there are ${asNumber(values, "parts", 4)} equal parts, how many objects are in the whole?`,
         options: (values) => {
@@ -518,7 +571,7 @@ function buildExamStageBundle(title: string, summary: string, accent: string, mo
         body: () => `Use the clue to eliminate quickly.`,
         derivation: () => `not red, not green, not yellow`,
         visual: () => eliminationBoardVisual(["blue", "red", "green", "yellow"], [1, 2, 3], "eliminate"),
-        prompt: () => `A choice is not red, not green, and not yellow. What must it be?`,
+        prompt: () => `The color is blue, red, green, or yellow. It is not red, green, or yellow. What must it be?`,
         options: () => textOptions("blue", "red", "green"),
         correctIndex: () => 0,
         success: () => `Exactly. Elimination can finish the problem before the arithmetic starts.`,
@@ -610,6 +663,7 @@ function buildG78ExamStages(title: string, summary: string): TopicLessonConfig {
         body: () => `An odd number leaves remainder 1 when divided by 2.`,
         derivation: (values) => `${asNumber(values, "value", 9)} mod 2`,
         visual: (values) => modularClockVisual(2, asNumber(values, "value", 9), "parity"),
+        checkVisual: (values) => givenInputsVisual(`number = ${asNumber(values, "value", 9)}`, "group into pairs", "even or odd?"),
         prompt: (values) => `Is ${asNumber(values, "value", 9)} even or odd?`,
         options: (values) => textOptions(asNumber(values, "value", 9) % 2 === 0 ? "even" : "odd", asNumber(values, "value", 9) % 2 === 0 ? "odd" : "even", "cannot tell"),
         correctIndex: () => 0,
@@ -652,6 +706,7 @@ function buildG910ExamStages(title: string, summary: string): TopicLessonConfig 
         body: () => `On a parabola, the vertex is the extreme point.`,
         derivation: (values) => `vertex x = ${asNumber(values, "h", 4)}`,
         visual: (values) => parabolaVisual(1, asNumber(values, "h", 4), asNumber(values, "k", 1), "vertex check"),
+        checkVisual: (values) => quadraticCheckVisual(1, asNumber(values, "h", 4), asNumber(values, "k", 1)),
         prompt: (values) => `Where does the graph reach its turning point?`,
         options: (values) => numberOptions(asNumber(values, "h", 4), asNumber(values, "h", 4) + 1, asNumber(values, "h", 4) - 1),
         correctIndex: () => 0,
@@ -694,6 +749,7 @@ function buildG1112ExamStages(title: string, summary: string): TopicLessonConfig
         body: () => `A modular check can confirm or reject a claim quickly.`,
         derivation: (values) => `${asNumber(values, "value", 17)} mod ${asNumber(values, "modulus", 5)}`,
         visual: (values) => modularClockVisual(asNumber(values, "modulus", 5), asNumber(values, "value", 17), "proof shortcut"),
+        checkVisual: (values) => givenInputsVisual(`number = ${asNumber(values, "value", 17)}`, `modulus = ${asNumber(values, "modulus", 5)}`, "remainder = ?"),
         prompt: (values) => `What remainder does ${asNumber(values, "value", 17)} leave when divided by ${asNumber(values, "modulus", 5)}?`,
         options: (values) => numberOptions(asNumber(values, "value", 17) % asNumber(values, "modulus", 5), asNumber(values, "modulus", 5) - 1, Math.floor(asNumber(values, "value", 17) / asNumber(values, "modulus", 5))),
         correctIndex: () => 0,
@@ -737,6 +793,7 @@ function buildNumberTheoryStages(title: string, summary: string): TopicLessonCon
         body: () => `Ask what is left after the full groups are made.`,
         derivation: (values) => `${asNumber(values, "number", 24)} mod ${asNumber(values, "divisor", 6)}`,
         visual: (values) => modularClockVisual(Math.max(2, asNumber(values, "divisor", 6)), asNumber(values, "number", 24), "mod move"),
+        checkVisual: (values) => givenInputsVisual(`number = ${asNumber(values, "number", 24)}`, `divisor = ${asNumber(values, "divisor", 6)}`, "remainder = ?"),
         prompt: (values) => `What is the remainder when ${asNumber(values, "number", 24)} is divided by ${asNumber(values, "divisor", 6)}?`,
         options: (values) => {
           const number = asNumber(values, "number", 24);
@@ -776,7 +833,7 @@ function buildFractionsRatiosStages(title: string, summary: string): TopicLesson
         title: "Worked Move",
         body: () => `${title} often hides a ratio inside a fraction, percent, or word comparison.`,
         derivation: (values) => `percent = part / whole × 100`,
-        visual: (values) => fractionBarVisual(10, clamp(Math.round((asNumber(values, "left", 2) / (asNumber(values, "left", 2) + asNumber(values, "right", 3))) * 10), 1, 9), "ratio as percent")
+        visual: (values) => fractionBarVisual(asNumber(values, "left", 2) + asNumber(values, "right", 3), asNumber(values, "left", 2), "first part of the whole")
       },
       {
         id: "check",
@@ -784,6 +841,7 @@ function buildFractionsRatiosStages(title: string, summary: string): TopicLesson
         body: () => `Scale both sides, not just one side.`,
         derivation: (values) => `${asNumber(values, "left", 2)} × ${asNumber(values, "scale", 20)}`,
         visual: (values) => doubleNumberLineVisual("original", "scaled", [asNumber(values, "left", 2), asNumber(values, "right", 3)], [asNumber(values, "left", 2) * asNumber(values, "scale", 20), asNumber(values, "right", 3) * asNumber(values, "scale", 20)], "equivalent ratio"),
+        checkVisual: (values) => givenInputsVisual(`ratio ${asNumber(values, "left", 2)}:${asNumber(values, "right", 3)}`, `new second part = ${asNumber(values, "right", 3) * asNumber(values, "scale", 20)}`, "new first part = ?"),
         prompt: (values) => `If the ratio is ${asNumber(values, "left", 2)}:${asNumber(values, "right", 3)}, what is the matching first part when the second part becomes ${asNumber(values, "right", 3) * asNumber(values, "scale", 20)}?`,
         options: (values) => {
           const correct = asNumber(values, "left", 2) * asNumber(values, "scale", 20);
@@ -835,6 +893,7 @@ function buildAlgebraPatternStages(title: string, summary: string): TopicLessonC
         body: () => `Feed the input through the rule machine.`,
         derivation: (values) => `${asNumber(values, "multiplier", 3)} × ${asNumber(values, "input", 4)} + ${asNumber(values, "shift", 2)}`,
         visual: (values) => functionMachineVisual(asNumber(values, "input", 4), asNumber(values, "multiplier", 3) * asNumber(values, "input", 4) + asNumber(values, "shift", 2), `${asNumber(values, "multiplier", 3)}x + ${asNumber(values, "shift", 2)}`, "evaluate"),
+        checkVisual: (values) => givenInputsVisual(`input = ${asNumber(values, "input", 4)}`, `rule: ${asNumber(values, "multiplier", 3)}x + ${asNumber(values, "shift", 2)}`, "output = ?"),
         prompt: (values) => `If y = ${asNumber(values, "multiplier", 3)}x + ${asNumber(values, "shift", 2)}, what is y when x = ${asNumber(values, "input", 4)}?`,
         options: (values) => {
           const correct = asNumber(values, "multiplier", 3) * asNumber(values, "input", 4) + asNumber(values, "shift", 2);
@@ -905,15 +964,15 @@ function buildGeometryMeasurementStages(title: string, summary: string): TopicLe
 
 function buildGraphsProbabilityStages(title: string, summary: string): TopicLessonConfig {
   return {
-    initialValues: { favorable: 5, rows: 3, cols: 4, dx: 3, dy: 2 },
+    initialValues: { favorable: 3, rows: 3, cols: 4, dx: 3, dy: 2 },
     stages: [
       {
         id: "idea",
         title: "Big Idea",
         body: () => `Graph and probability questions both start with one honest count.`,
-        derivation: (values) => `${asNumber(values, "favorable", 5)}/${asNumber(values, "rows", 3) * asNumber(values, "cols", 4)}`,
-        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 3), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 5), 1, asNumber(values, "rows", 3) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "count outcomes"),
-        controls: [range("rows", "rows", 2, 4), range("cols", "cols", 2, 5), range("favorable", "favorable", 1, 10)],
+        derivation: (values) => `${asNumber(values, "favorable", 3)}/${asNumber(values, "rows", 3) * asNumber(values, "cols", 4)}`,
+        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 3), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 3), 1, asNumber(values, "rows", 3) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "count outcomes"),
+        controls: [range("rows", "rows", 2, 4), range("cols", "cols", 2, 5), range("favorable", "favorable", 1, 4)],
         speak: () => `Count the favorable outcomes and the total outcomes separately.`
       },
       {
@@ -927,11 +986,11 @@ function buildGraphsProbabilityStages(title: string, summary: string): TopicLess
         id: "check",
         title: "Quick Check",
         body: () => `Probability is favorable over total.`,
-        derivation: (values) => `${asNumber(values, "favorable", 5)}/${asNumber(values, "rows", 3) * asNumber(values, "cols", 4)}`,
-        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 3), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 5), 1, asNumber(values, "rows", 3) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "probability ratio"),
+        derivation: (values) => `${asNumber(values, "favorable", 3)}/${asNumber(values, "rows", 3) * asNumber(values, "cols", 4)}`,
+        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 3), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 3), 1, asNumber(values, "rows", 3) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "probability ratio"),
         prompt: (values) => `What is the probability of a favorable outcome?`,
         options: (values) => {
-          const favorable = asNumber(values, "favorable", 5);
+          const favorable = asNumber(values, "favorable", 3);
           const total = asNumber(values, "rows", 3) * asNumber(values, "cols", 4);
           return textOptions(`${favorable}/${total}`, `${total}/${favorable}`, `1/${favorable}`);
         },
@@ -1001,9 +1060,9 @@ function buildRatiosPercentsStages(title: string, summary: string): TopicLessonC
         id: "idea",
         title: "Big Idea",
         body: () => `Percent is just another way to say part per hundred.`,
-        derivation: (values) => `${asNumber(values, "part", 3)}/${asNumber(values, "whole", 5)} = ${(asNumber(values, "part", 3) / asNumber(values, "whole", 5) * 100).toFixed(0)}%`,
-        visual: (values) => doubleNumberLineVisual("fraction", "percent", [0, asNumber(values, "part", 3), asNumber(values, "whole", 5)], [0, Math.round(asNumber(values, "part", 3) / asNumber(values, "whole", 5) * 100), 100], "fraction to percent"),
-        controls: [range("part", "part", 1, 9), range("whole", "whole", 2, 10)],
+        derivation: (values) => `${asNumber(values, "part", 3)}/${asNumber(values, "whole", 5)} = ${rationalText(asNumber(values, "part", 3) * 100, asNumber(values, "whole", 5))}%`,
+        visual: (values) => formulaVisual([`${asNumber(values, "part", 3)}/${asNumber(values, "whole", 5)}`, `= ${rationalText(asNumber(values, "part", 3) * 100, asNumber(values, "whole", 5))}%`], "fraction to percent"),
+        controls: [range("part", "part", 1, 9), toggle("whole", "whole", [2, 4, 5, 10].map((value) => ({ label: String(value), value })))],
         speak: () => `Think of percent as out of one hundred.`
       },
       {
@@ -1011,17 +1070,17 @@ function buildRatiosPercentsStages(title: string, summary: string): TopicLessonC
         title: "Worked Move",
         body: () => `${title} gets easier when you benchmark with 50%, 25%, 10%, and 1%.`,
         derivation: () => `scale to 100 or use benchmark fractions`,
-        visual: (values) => fractionBarVisual(10, clamp(Math.round(asNumber(values, "part", 3) / asNumber(values, "whole", 5) * 10), 1, 10), "percent strip")
+        visual: (values) => formulaVisual([`100% = ${asNumber(values, "whole", 5)}/${asNumber(values, "whole", 5)}`, `50% = one half`, "more than one whole means more than 100%"], "percent benchmarks")
       },
       {
         id: "check",
         title: "Quick Check",
         body: () => `Convert the ratio into a percent.`,
         derivation: (values) => `${asNumber(values, "part", 3)} ÷ ${asNumber(values, "whole", 5)} × 100`,
-        visual: (values) => doubleNumberLineVisual("ratio", "percent", [0, asNumber(values, "part", 3), asNumber(values, "whole", 5)], [0, Math.round(asNumber(values, "part", 3) / asNumber(values, "whole", 5) * 100), 100], "percent check"),
+        visual: (values) => formulaVisual([`${asNumber(values, "part", 3)}/${asNumber(values, "whole", 5)} × 100`, "percent = ?"], "percent check"),
         prompt: (values) => `What percent is ${asNumber(values, "part", 3)}/${asNumber(values, "whole", 5)}?`,
         options: (values) => {
-          const correct = Math.round(asNumber(values, "part", 3) / asNumber(values, "whole", 5) * 100);
+          const correct = rationalText(asNumber(values, "part", 3) * 100, asNumber(values, "whole", 5));
           return textOptions(`${correct}%`, `${asNumber(values, "part", 3) * 10}%`, `${asNumber(values, "whole", 5) * 10}%`);
         },
         correctIndex: () => 0,
@@ -1063,7 +1122,7 @@ function buildGeometryReasoningStages(title: string, summary: string): TopicLess
         id: "check",
         title: "Quick Check",
         body: () => `If the side scale doubles, area does not just double.`,
-        derivation: (values) => `${asNumber(values, "scale", 2)}² = ${asNumber(values, "scale", 2) ** 2}`,
+        derivation: (values) => `area factor = ${asNumber(values, "scale", 2)}²`,
         visual: (values) => similarityVisual(asNumber(values, "scale", 2), "area scale"),
         prompt: (values) => `If the side lengths are multiplied by ${asNumber(values, "scale", 2)}, what happens to area?`,
         options: (values) => textOptions(`${asNumber(values, "scale", 2) ** 2} times as large`, `${asNumber(values, "scale", 2)} times as large`, `stays the same`),
@@ -1122,6 +1181,7 @@ function buildGraphsFunctionsStages(title: string, summary: string): TopicLesson
           { x: 4, y: asNumber(values, "slope", 2) * 4 + asNumber(values, "intercept", 1), label: "?" }
         ], 2, [0, 1]),
         prompt: (values) => `If y = ${asNumber(values, "slope", 2)}x + ${asNumber(values, "intercept", 1)}, what is y when x = 4?`,
+        checkVisual: (values) => givenInputsVisual("input x = 4", `rule: y = ${asNumber(values, "slope", 2)}x + ${asNumber(values, "intercept", 1)}`, "output y = ?"),
         options: (values) => {
           const correct = asNumber(values, "slope", 2) * 4 + asNumber(values, "intercept", 1);
           return numberOptions(correct, correct + asNumber(values, "slope", 2), correct - asNumber(values, "slope", 2));
@@ -1201,7 +1261,7 @@ function buildAlgebraModelsStages(title: string, summary: string): TopicLessonCo
         title: "Big Idea",
         body: () => `Model the situation first. On a graph, the answer is often where two rules meet.`,
         derivation: (values) => `${asNumber(values, "slope1", 1)}x + ${asNumber(values, "intercept1", 2)} = ${asNumber(values, "slope2", -1)}x + ${asNumber(values, "intercept2", 6)}`,
-        visual: (values) => systemGraphVisual(asNumber(values, "slope1", 1), asNumber(values, "intercept1", 2), asNumber(values, "slope2", -1), asNumber(values, "intercept2", 6), "two rules, one point"),
+        visual: (values) => systemLessonVisual(asNumber(values, "slope1", 1), asNumber(values, "intercept1", 2), asNumber(values, "slope2", -1), asNumber(values, "intercept2", 6), "two rules, one point"),
         controls: [range("slope1", "line 1 slope", 1, 3), range("intercept1", "line 1 intercept", 0, 4), range("intercept2", "line 2 intercept", 4, 8)],
         speak: () => `A model becomes solvable once you can see the two rules clearly.`
       },
@@ -1217,15 +1277,17 @@ function buildAlgebraModelsStages(title: string, summary: string): TopicLessonCo
         title: "Quick Check",
         body: () => `Intersection means both rules are true at the same time.`,
         derivation: (values) => `${asNumber(values, "slope1", 1)}x + ${asNumber(values, "intercept1", 2)} = ${asNumber(values, "slope2", -1)}x + ${asNumber(values, "intercept2", 6)}`,
-        visual: (values) => systemGraphVisual(asNumber(values, "slope1", 1), asNumber(values, "intercept1", 2), asNumber(values, "slope2", -1), asNumber(values, "intercept2", 6), "find the meeting point"),
+        visual: (values) => systemLessonVisual(asNumber(values, "slope1", 1), asNumber(values, "intercept1", 2), asNumber(values, "slope2", -1), asNumber(values, "intercept2", 6), "find the meeting point"),
+        checkVisual: (values) => givenInputsVisual(`y = ${asNumber(values, "slope1", 1)}x + ${asNumber(values, "intercept1", 2)}`, `y = ${asNumber(values, "slope2", -1)}x + ${asNumber(values, "intercept2", 6)}`, "x at intersection = ?"),
         prompt: (values) => `What is the x-value where the two lines meet?`,
         options: (values) => {
           const m1 = asNumber(values, "slope1", 1);
           const b1 = asNumber(values, "intercept1", 2);
           const m2 = asNumber(values, "slope2", -1);
           const b2 = asNumber(values, "intercept2", 6);
-          const correct = (b2 - b1) / (m1 - m2);
-          return numberOptions(Math.round(correct), Math.round(correct) + 1, Math.round(correct) - 1);
+          const numerator = b2 - b1;
+          const denominator = m1 - m2;
+          return textOptions(rationalText(numerator, denominator), rationalText(numerator + denominator, denominator), rationalText(numerator - denominator, denominator));
         },
         correctIndex: () => 0,
         success: () => `Nice. The intersection is where both equations agree.`,
@@ -1268,6 +1330,7 @@ function buildFunctionsSequencesStages(title: string, summary: string): TopicLes
         body: () => `The vertex is the turn point of the parabola.`,
         derivation: (values) => `vertex = (${asNumber(values, "h", 3)}, ${asNumber(values, "k", 2)})`,
         visual: (values) => parabolaVisual(asNumber(values, "a", 1), asNumber(values, "h", 3), asNumber(values, "k", 2), "find the vertex"),
+        checkVisual: (values) => quadraticCheckVisual(asNumber(values, "a", 1), asNumber(values, "h", 3), asNumber(values, "k", 2)),
         prompt: (values) => `What is the x-coordinate of the vertex?`,
         options: (values) => numberOptions(asNumber(values, "h", 3), asNumber(values, "h", 3) + 1, asNumber(values, "h", 3) - 1),
         correctIndex: () => 0,
@@ -1293,7 +1356,7 @@ function buildGeometryAdvancedStages(title: string, summary: string): TopicLesso
         id: "idea",
         title: "Big Idea",
         body: () => `Advanced geometry questions often become simpler when you spot the key radius, chord, or similar triangle.`,
-        derivation: (values) => `${asNumber(values, "angle", 60)}° is ${asNumber(values, "angle", 60) / 360} of a full circle`,
+        derivation: (values) => `${asNumber(values, "angle", 60)}° is ${rationalText(asNumber(values, "angle", 60), 360)} of a full circle`,
         visual: (values) => circleGeometryVisual(asNumber(values, "radius", 5), asNumber(values, "angle", 60), "circle fact"),
         controls: [range("radius", "radius", 3, 8), range("angle", "central angle", 30, 150)],
         speak: () => `Mark the radius or angle that controls the whole picture.`
@@ -1333,15 +1396,15 @@ function buildGeometryAdvancedStages(title: string, summary: string): TopicLesso
 
 function buildProbabilityStrategyStages(title: string, summary: string): TopicLessonConfig {
   return {
-    initialValues: { rows: 4, cols: 4, favorable: 6 },
+    initialValues: { rows: 4, cols: 4, favorable: 3 },
     stages: [
       {
         id: "idea",
         title: "Big Idea",
         body: () => `Probability strategy questions ask you to count smartly, not exhaustively.`,
-        derivation: (values) => `${asNumber(values, "favorable", 6)}/${asNumber(values, "rows", 4) * asNumber(values, "cols", 4)}`,
-        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 4), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 6), 1, asNumber(values, "rows", 4) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "sample space"),
-        controls: [range("rows", "row choices", 2, 5), range("cols", "column choices", 2, 5), range("favorable", "favorable", 1, 12)],
+        derivation: (values) => `${asNumber(values, "favorable", 3)}/${asNumber(values, "rows", 4) * asNumber(values, "cols", 4)}`,
+        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 4), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 3), 1, asNumber(values, "rows", 4) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "sample space"),
+        controls: [range("rows", "row choices", 2, 5), range("cols", "column choices", 2, 5), range("favorable", "favorable", 1, 4)],
         speak: () => `Count the total space first. Then locate the favorable part.`
       },
       {
@@ -1349,17 +1412,17 @@ function buildProbabilityStrategyStages(title: string, summary: string): TopicLe
         title: "Worked Move",
         body: () => `${title} often gets easier when you count the complement instead.`,
         derivation: (values) => `not favorable = total − favorable`,
-        visual: (values) => formulaVisual([`total = ${asNumber(values, "rows", 4) * asNumber(values, "cols", 4)}`, `not favorable = total − ${asNumber(values, "favorable", 6)}`], "complement")
+        visual: (values) => formulaVisual([`total = ${asNumber(values, "rows", 4) * asNumber(values, "cols", 4)}`, `not favorable = total − ${asNumber(values, "favorable", 3)}`], "complement")
       },
       {
         id: "check",
         title: "Quick Check",
         body: () => `Use favorable over total.`,
-        derivation: (values) => `${asNumber(values, "favorable", 6)}/${asNumber(values, "rows", 4) * asNumber(values, "cols", 4)}`,
-        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 4), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 6), 1, asNumber(values, "rows", 4) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "probability check"),
+        derivation: (values) => `${asNumber(values, "favorable", 3)}/${asNumber(values, "rows", 4) * asNumber(values, "cols", 4)}`,
+        visual: (values) => probabilityGridVisual(asNumber(values, "rows", 4), asNumber(values, "cols", 4), Array.from({ length: clamp(asNumber(values, "favorable", 3), 1, asNumber(values, "rows", 4) * asNumber(values, "cols", 4)) }).map((_, index) => [Math.floor(index / asNumber(values, "cols", 4)), index % asNumber(values, "cols", 4)] as [number, number]), "probability check"),
         prompt: (values) => `What is the probability of the favorable event?`,
         options: (values) => {
-          const favorable = asNumber(values, "favorable", 6);
+          const favorable = asNumber(values, "favorable", 3);
           const total = asNumber(values, "rows", 4) * asNumber(values, "cols", 4);
           return textOptions(`${favorable}/${total}`, `${total - favorable}/${total}`, `${total}/${favorable}`);
         },
@@ -1404,6 +1467,7 @@ function buildNumberTheoryStrategyStages(title: string, summary: string): TopicL
         body: () => `Walk around the modular wheel, then stop at the remainder.`,
         derivation: (values) => `${asNumber(values, "value", 23)} mod ${asNumber(values, "modulus", 7)}`,
         visual: (values) => modularClockVisual(asNumber(values, "modulus", 7), asNumber(values, "value", 23), "remainder stop"),
+        checkVisual: (values) => givenInputsVisual(`number = ${asNumber(values, "value", 23)}`, `modulus = ${asNumber(values, "modulus", 7)}`, "remainder = ?"),
         prompt: (values) => `What is ${asNumber(values, "value", 23)} mod ${asNumber(values, "modulus", 7)}?`,
         options: (values) => {
           const value = asNumber(values, "value", 23);
@@ -1452,8 +1516,9 @@ function buildAdvancedAlgebraStages(title: string, summary: string): TopicLesson
         id: "check",
         title: "Quick Check",
         body: () => `If the roots are visible, the x-intercepts are visible too.`,
-        derivation: (values) => `root sum = ${asNumber(values, "root1", 2) + asNumber(values, "root2", 5)}`,
+        derivation: (values) => `root sum = ${asNumber(values, "root1", 2)} + ${asNumber(values, "root2", 5)}`,
         visual: (values) => polynomialRootsVisual(asNumber(values, "root1", 2), asNumber(values, "root2", 5), "root sum"),
+        checkVisual: (values) => givenInputsVisual(`first root = ${asNumber(values, "root1", 2)}`, `second root = ${asNumber(values, "root2", 5)}`, "sum of the roots = ?"),
         prompt: (values) => `What is the sum of the roots?`,
         options: (values) => numberOptions(asNumber(values, "root1", 2) + asNumber(values, "root2", 5), asNumber(values, "root1", 2) * asNumber(values, "root2", 5), Math.abs(asNumber(values, "root2", 5) - asNumber(values, "root1", 2))),
         correctIndex: () => 0,
@@ -1495,12 +1560,15 @@ function buildFunctionsAnalysisStages(title: string, summary: string): TopicLess
         id: "check",
         title: "Quick Check",
         body: () => `Name the vertical change correctly.`,
-        derivation: (values) => `+ ${asNumber(values, "shiftY", 2)} moves the graph up ${asNumber(values, "shiftY", 2)}`,
-        visual: (values) => transformGraphVisual(asNumber(values, "shiftX", 1), asNumber(values, "shiftY", 2), asNumber(values, "stretch", 2), "vertical change"),
+        derivation: (values) => `compare f(x) with f(x) + ${asNumber(values, "shiftY", 2)}`,
+        visual: (values) => transformGraphVisual(0, asNumber(values, "shiftY", 2), 1, "vertical change"),
+        checkVisual: (values) => givenInputsVisual("original rule: f(x)", `new rule: f(x) + ${asNumber(values, "shiftY", 2)}`, "how does the graph change?"),
         prompt: (values) => `If a graph becomes f(x) + ${asNumber(values, "shiftY", 2)}, what happens?`,
-        options: (values) => textOptions(`it moves up ${asNumber(values, "shiftY", 2)}`, `it moves right ${asNumber(values, "shiftY", 2)}`, `it stretches by ${asNumber(values, "shiftY", 2)}`),
+        options: (values) => asNumber(values, "shiftY", 2) === 0
+          ? textOptions("it stays in the same place", "it moves up 1", "it moves right 1")
+          : textOptions(`it moves up ${asNumber(values, "shiftY", 2)}`, `it moves right ${asNumber(values, "shiftY", 2)}`, `it stretches by ${asNumber(values, "shiftY", 2)}`),
         correctIndex: () => 0,
-        success: () => `Exactly. Adding outside the function moves the graph up.`,
+        success: (values) => asNumber(values, "shiftY", 2) === 0 ? `Exactly. Adding zero leaves the graph unchanged.` : `Exactly. Adding outside the function moves the graph up.`,
         retry: () => `Outside the function changes height, not horizontal position.`
       },
       {
@@ -1523,7 +1591,7 @@ function buildGeometryTrigStages(title: string, summary: string): TopicLessonCon
         title: "Big Idea",
         body: () => `Trigonometric geometry starts with one clean triangle. Label the opposite, adjacent, and hypotenuse.`,
         derivation: (values) => `${asNumber(values, "adjacent", 6)}² + ${asNumber(values, "opposite", 8)}²`,
-        visual: (values) => trigTriangleVisual(asNumber(values, "adjacent", 6), asNumber(values, "opposite", 8), "right triangle"),
+        visual: (values) => rightTriangleLessonVisual(asNumber(values, "adjacent", 6), asNumber(values, "opposite", 8)),
         controls: [range("adjacent", "adjacent", 3, 9), range("opposite", "opposite", 4, 12)],
         speak: () => `Name the sides relative to the chosen angle before using a trig ratio or Pythagorean fact.`
       },
@@ -1539,16 +1607,16 @@ function buildGeometryTrigStages(title: string, summary: string): TopicLessonCon
         title: "Quick Check",
         body: () => `Use the side labels, not memory alone.`,
         derivation: (values) => `${asNumber(values, "adjacent", 6)}² + ${asNumber(values, "opposite", 8)}²`,
-        visual: (values) => trigTriangleVisual(asNumber(values, "adjacent", 6), asNumber(values, "opposite", 8), "find the hypotenuse"),
+        visual: (values) => rightTriangleLessonVisual(asNumber(values, "adjacent", 6), asNumber(values, "opposite", 8)),
         prompt: (values) => `What is the hypotenuse?`,
+        checkVisual: (values) => rightTriangleLessonVisual(asNumber(values, "adjacent", 6), asNumber(values, "opposite", 8)),
         options: (values) => {
           const a = asNumber(values, "adjacent", 6);
           const b = asNumber(values, "opposite", 8);
-          const hyp = Math.round(Math.sqrt(a * a + b * b));
-          return numberOptions(hyp, a + b, Math.abs(a - b));
+          return textOptions(exactHypotenuse(a, b), String(a + b), String(Math.abs(a - b)));
         },
         correctIndex: () => 0,
-        success: () => `Correct. The right triangle gave you the structure.`,
+        success: (values) => `Correct. c = ${exactHypotenuse(asNumber(values, "adjacent", 6), asNumber(values, "opposite", 8))} by the Pythagorean theorem.`,
         retry: () => `Use the Pythagorean relationship on the labeled sides.`
       },
       {
@@ -1654,6 +1722,28 @@ export function hasSpecificGuidedBuilder(bandId: string, topicKey: string): bool
   return Boolean(SPECIFIC_TOPIC_BUILDERS[`${bandId}:${topicKey}`]);
 }
 
+function shuffledCheck(stage: GuidedStage, topicId: string): GuidedStage {
+  const options = stage.options;
+  const correctIndex = stage.correctIndex;
+  if (!options || !correctIndex) return stage;
+  const order = (values: Record<string, LessonValue>): number[] => {
+    const input = `${topicId}:${stage.id}:${JSON.stringify(Object.keys(values).sort().map((key) => [key, values[key]]))}`;
+    let seed = 2166136261;
+    for (const char of input) seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
+    return shuffled([0, 1, 2], new SeededRng(seed >>> 0));
+  };
+  return {
+    ...stage,
+    // Re-rendering a check must not move the answer or lose its selected index.
+    options: (values) => {
+      const choices = options(values);
+      const positions = order(values);
+      return [choices[positions[0]], choices[positions[1]], choices[positions[2]]];
+    },
+    correctIndex: (values) => order(values).indexOf(correctIndex(values))
+  };
+}
+
 function fallbackGuidedTopic(title: string, summary: string): TopicLessonConfig {
   return {
     initialValues: { a: 8, b: 5 },
@@ -1717,7 +1807,7 @@ export function buildGuidedTopics(coverageMap: BandCoverageMap): GuidedTopic[] {
       skills: rows.map((row) => row.skillId),
       grades: coverageMap.grades,
       initialValues: built.initialValues,
-      stages: built.stages
+      stages: built.stages.map((stage) => shuffledCheck(stage, `${coverageMap.bandId}_${topicKey}`))
     };
   });
 }

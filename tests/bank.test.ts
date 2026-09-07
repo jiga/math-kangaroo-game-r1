@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import g12Coverage from "../src/content/g1g2/coverage-map.json";
+import { bank as g12Bank } from "../src/content/bands/g12/bank";
 import { bankForGrade, bankStatsForGrade, buildContestQuestionsForGrade, buildTemplatesForGrade, questionCountForGrade } from "../src/content/bands/index";
 import type { Grade } from "../src/domain/types";
 
@@ -12,11 +13,27 @@ function configForGrade(grade: Grade) {
 }
 
 function skillRowsForGrade(grade: Grade) {
-  if (grade <= 2) {
-    return g12Coverage.grades[String(grade) as "1" | "2"].curriculum;
+  if (grade === 1 || grade === 2) {
+    return g12Coverage.grades[grade].curriculum;
   }
-  return bankForGrade(grade).coverageMap.curriculum;
+  const coverage = bankForGrade(grade).coverageMap;
+  assert.ok("curriculum" in coverage, `Grade ${grade} bank is missing curriculum coverage`);
+  return coverage.curriculum;
 }
+
+test("g12 facade rejects older grades for grade-specific APIs", () => {
+  for (const grade of [3, 12] as const) {
+    assert.throws(() => g12Bank.buildTemplates(grade), RangeError);
+    assert.throws(() => g12Bank.createPracticeProvider(grade), RangeError);
+    assert.throws(() => g12Bank.bankStats(grade), RangeError);
+    assert.throws(() => g12Bank.allSkills(grade), RangeError);
+    assert.deepEqual(g12Bank.buildContestQuestions(grade, 123), []);
+  }
+});
+
+test("g12 facade defaults skill lookup to grade 1", () => {
+  assert.deepEqual(g12Bank.allSkills(), g12Bank.allSkills(1));
+});
 
 for (const grade of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const) {
   test(`grade ${grade} coverage is complete`, () => {
@@ -54,7 +71,8 @@ for (const grade of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const) {
     const stats = bankStatsForGrade(grade);
     for (const row of skillRowsForGrade(grade)) {
       const familyCount = Object.keys(stats.byFamily).filter((key) => key.startsWith(`${row.skillId}:`)).length;
-      const requiredFamilies = row.requiredFamilies ?? (row.requiredTemplates >= 8 ? 4 : 3);
+      const requiredFamilies = ("requiredFamilies" in row ? row.requiredFamilies : undefined)
+        ?? (row.requiredTemplates >= 8 ? 4 : 3);
       assert.ok(familyCount >= requiredFamilies, `${row.skillId} only has ${familyCount} families`);
     }
   });

@@ -1,6 +1,5 @@
-import coverageMap from './coverage-map.json';
 import { createBandBankApi } from '../common';
-import { FAMILY_LIBRARY } from './families';
+import { coverageMap, FAMILY_LIBRARY } from './families';
 import { CONTEST_BLUEPRINT } from './contestBlueprint';
 
 export const bank = createBandBankApi({

@@ -14,9 +14,10 @@ const rootHtml = resolve(root, "index.html");
 
 await mkdir(distDir, { recursive: true });
 
-const [templateHtml, cssRaw] = await Promise.all([
+const [templateHtml, cssRaw, studioCss] = await Promise.all([
   readFile(srcTemplate, "utf8"),
-  readFile(srcCss, "utf8")
+  readFile(srcCss, "utf8"),
+  readFile(resolve(root, "src/app/studio.css"), "utf8")
 ]);
 
 const jsBundle = await build({
@@ -30,7 +31,7 @@ const jsBundle = await build({
 });
 
 const jsCode = jsBundle.outputFiles[0].text;
-const cssMin = await transform(cssRaw, { loader: "css", minify: true });
+const cssMin = await transform(cssRaw + "\n" + studioCss, { loader: "css", minify: true, target: ["chrome90"] });
 
 const html = templateHtml
   .replace("__APP_CSS__", cssMin.code)

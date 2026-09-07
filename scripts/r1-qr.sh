@@ -41,23 +41,26 @@ PY
   "${QR_VENV}/bin/python" -m pip install -q "qrcode[pil]"
 fi
 
-"${QR_VENV}/bin/python" - <<PY
+"${QR_VENV}/bin/python" - "${URL}" "${QR_OUT}" <<'PY'
 import json
 import qrcode
+import sys
+
+url, output = sys.argv[1:]
 
 payload = {
-  "title": "Math Kangaroo Adventure",
-  "url": "${URL}",
-  "description": "Grade 1-2 Math Kangaroo trainer with adaptive practice and contest mode.",
+  "title": "Kangaroo Studio",
+  "url": url,
+  "description": "Visual labs, adaptive missions and Math Kangaroo practice exams. Grades 1-12.",
   "iconUrl": "",
   "themeColor": "#00e5ff"
 }
 
 data = json.dumps(payload, separators=(",", ":"))
 img = qrcode.make(data)
-img.save("${QR_OUT}")
-print(f"Install URL: ${URL}")
-print(f"QR code saved to ${QR_OUT}")
+img.save(output)
+print(f"Install URL: {url}")
+print(f"QR code saved to {output}")
 print("QR code (terminal):")
 qr = qrcode.QRCode(border=1)
 qr.add_data(data)

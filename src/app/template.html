@@ -2,42 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=240,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <title>Math Kangaroo R1</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Kangaroo Studio</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b1220'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='28' font-family='Arial' fill='%23ffffff'%3EMK%3C/text%3E%3C/svg%3E" />
   <style>
 __APP_CSS__
   </style>
 </head>
-<body data-theme="neon">
+<body data-theme="gameboy" data-studio="true">
   <div id="app" class="app">
     <main id="home-screen" class="screen active">
-      <section class="card head-row">
-        <h1 id="title">MATH KANGAROO</h1>
+      <header class="studio-header">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">k.</span><div><h1 id="title">Kangaroo Studio</h1><span class="brand-caption">Little discoveries. Big possibilities.</span></div></div>
         <div class="theme-switch" role="group" aria-label="Theme">
-          <button id="theme-gb" class="btn btn-theme" data-theme="gameboy">GB</button>
-          <button id="theme-neon" class="btn btn-theme active" data-theme="neon">NEON</button>
+          <button id="theme-gb" class="btn btn-theme" data-theme="gameboy" aria-label="Classroom theme">Board</button>
+          <button id="theme-neon" class="btn btn-theme" data-theme="neon" aria-label="Neon theme">Neon</button>
         </div>
-      </section>
-
-      <div class="screen-scroll" data-scrollable="true" tabindex="0">
-        <section class="card">
-          <h2>SELECT GRADE</h2>
+      </header>
+      <div class="learner-bar"><button id="grade-toggle" class="text-button" aria-expanded="false" aria-controls="grade-picker">Grade <span id="selected-grade">1</span> <span aria-hidden="true">&#8964;</span></button><button id="progress-btn" class="text-button">My progress &#8599;</button></div>
+      <div class="screen-scroll home-content" data-scrollable="true" tabindex="0" aria-label="Your learning home">
+        <section id="grade-picker" class="card" hidden>
+          <h2>Choose your grade</h2>
           <div id="grade-grid" class="grade-grid"></div>
+          <p class="small-note">New to math? Start with Grade 1, at your own pace.</p>
         </section>
-
-        <section class="card">
-          <h2>MODE</h2>
+        <div class="studio-home-grid">
+        <section class="mission-card">
+          <div class="eyebrow" id="mission-eyebrow">YOUR NEXT DISCOVERY</div>
+          <h2 id="mission-title">Small steps.<br>Big discoveries.</h2>
+          <p id="mission-description">Six puzzles picked for you. Think, try, and find your way.</p>
+          <div id="mission-trail" class="mission-trail"></div>
+          <div class="mission-caption"><span id="mission-size">6 puzzles</span><span id="mission-pace">At your pace</span></div>
+        </section>
+        <section class="studio-paths" aria-label="Ways to learn">
           <div class="mode-row">
-            <button id="mode-contest" class="btn btn-mode active" data-mode="contest">CONTEST</button>
-            <button id="mode-learn" class="btn btn-mode" data-mode="learn">LEARN</button>
-            <button id="mode-practice" class="btn btn-mode" data-mode="practice">PRACTICE</button>
+            <button id="mode-practice" class="btn btn-mode active" data-mode="practice"><span class="mode-name">Mission</span><span class="mode-detail">A next step picked for you</span></button>
+            <button id="mode-learn" class="btn btn-mode" data-mode="learn"><span class="mode-name">Explore</span><span class="mode-detail">Touch an idea. See it change.</span></button>
+            <button id="mode-contest" class="btn btn-mode" data-mode="contest"><span class="mode-name">Mock exam</span><span class="mode-detail">Put your thinking to the test</span></button>
           </div>
           <p id="mode-info" class="mode-info"></p>
+          <div id="home-evidence" class="home-evidence"></div>
+          <div class="studio-note"><span class="eyebrow">THE WAY WE LEARN</span><h3>Wonder. Try. Understand.</h3><p>Make a prediction, move something, and explain what changed. Every mistake gives us a useful next step.</p><span class="note-orbit" aria-hidden="true"></span></div>
         </section>
+        </div>
       </div>
-
-      <button id="start-btn" class="btn btn-start">START</button>
+      <button id="start-btn" class="btn btn-start">Start my mission &#8594;</button>
     </main>
 
     <main id="game-screen" class="screen">
@@ -68,6 +77,8 @@ __APP_CSS__
 
       <section class="card question-card" data-scrollable="true" tabindex="0">
         <div id="question-meta" class="question-meta"></div>
+        <div id="progress-panel" hidden></div>
+        <div id="mission-dots" class="mission-dots" aria-label="Mission progress" hidden></div>
         <div id="topic-browser" class="topic-browser" hidden></div>
         <div id="guided-panel" class="guided-panel" hidden>
           <div class="guided-top">
@@ -78,9 +89,8 @@ __APP_CSS__
             <button id="guided-back" class="guided-back btn-ghost" aria-label="Back to topics">TOPICS</button>
           </div>
           <div id="guided-step-title" class="guided-step-title"></div>
-          <div id="guided-derivation" class="guided-derivation"></div>
           <div id="guided-visual" class="guided-visual" aria-live="polite"></div>
-          <div id="guided-step-body" class="guided-step-body"></div>
+          <div id="guided-derivation" class="guided-derivation"></div>
           <div id="guided-controls" class="guided-controls" hidden>
             <div id="guided-param-strip" class="guided-param-strip"></div>
             <div id="guided-control-deck" class="guided-control-deck"></div>
@@ -88,9 +98,12 @@ __APP_CSS__
           <div id="guided-choice-prompt" class="guided-choice-prompt" hidden></div>
           <div id="guided-choice-options" class="guided-choice-options" hidden></div>
           <div id="guided-choice-feedback" class="guided-choice-feedback" hidden></div>
+          <details id="guided-notes" class="guided-notes"><summary>Explore the idea</summary><div id="guided-step-body" class="guided-step-body"></div></details>
           <div class="guided-actions">
+            <button id="guided-read" class="text-button" aria-label="Read this step aloud">Listen</button>
             <button id="guided-next" class="btn btn-start">NEXT</button>
           </div>
+          <button id="guided-practice" class="btn" hidden>Try these ideas in a mission</button>
         </div>
         <div id="learn-panel" class="learn-panel" hidden>
           <div class="learn-top">
@@ -112,8 +125,20 @@ __APP_CSS__
           </div>
         </div>
         <div id="question-text" class="question-text"></div>
+        <button id="question-read" class="text-button" hidden aria-label="Read the question aloud">Listen to the question</button>
         <div id="question-visual" class="question-visual" aria-live="polite"></div>
         <div id="options" class="options"></div>
+        <div id="contest-nav" class="contest-nav" hidden>
+          <button id="contest-prev" class="btn" aria-label="Previous question">Back</button>
+          <button id="contest-next" class="btn btn-start">Next</button>
+          <button id="contest-review-btn" class="text-button">Review paper</button>
+        </div>
+        <section id="contest-review" hidden></section>
+        <section id="answer-feedback" class="answer-feedback" hidden aria-live="polite">
+          <div class="eyebrow" id="feedback-kicker"></div><h2 id="feedback-title"></h2><p id="feedback-explanation"></p>
+          <p id="feedback-strategy" class="feedback-strategy"></p>
+          <div class="feedback-actions"><button id="feedback-learn" class="btn">Explore this idea</button><button id="feedback-next" class="btn btn-start">Next puzzle</button></div>
+        </section>
         <div id="scroll-rail" class="scroll-rail" hidden aria-hidden="true">
           <button id="scroll-rail-up" class="scroll-rail-step" aria-label="Scroll up">▲</button>
           <div id="scroll-rail-track" class="scroll-rail-track" aria-hidden="true">
@@ -126,12 +151,13 @@ __APP_CSS__
 
     <main id="result-screen" class="screen">
       <section class="card result-card" data-scrollable="true" tabindex="0">
-        <h2>RESULT</h2>
-        <p class="result-line">Score: <span id="res-score"></span></p>
+        <div class="eyebrow">A STEP FORWARD</div><h2 id="result-title">Mission complete</h2><div id="result-trail" class="mission-trail"></div>
+        <p id="res-score-row" class="result-line">Score: <span id="res-score"></span></p>
         <p class="result-line">Correct: <span id="res-correct"></span></p>
-        <p class="result-line">Accuracy: <span id="res-accuracy"></span></p>
+        <p id="res-accuracy-row" class="result-line">Accuracy: <span id="res-accuracy"></span></p>
         <p class="result-line" id="res-stage"></p>
         <p class="result-line" id="res-focus"></p>
+        <div id="result-evidence" class="home-evidence"></div>
       </section>
       <div class="result-actions">
         <button id="retry-btn" class="btn btn-start">PLAY AGAIN</button>
@@ -141,18 +167,22 @@ __APP_CSS__
 
     <div id="coach-overlay" class="overlay" aria-hidden="true">
       <section class="card overlay-card">
-        <h2 id="coach-title">Help</h2>
+        <h2 id="coach-title">Let's think together</h2>
         <p id="coach-status" class="coach-status">Pick a card, then tap SAY IT or press the side button.</p>
         <div class="coach-mode-row">
           <button id="coach-hint" class="btn btn-mode coach-mode-btn" data-help-mode="hint">HINT</button>
           <button id="coach-steps" class="btn btn-mode coach-mode-btn" data-help-mode="steps">STEPS</button>
           <button id="coach-explain" class="btn btn-mode coach-mode-btn" data-help-mode="explain">WHY</button>
         </div>
-        <div id="coach-visual" class="coach-visual" aria-live="polite"></div>
-        <pre id="coach-body" class="coach-body" data-scrollable="true" tabindex="0"></pre>
+        <div id="coach-scroll" class="coach-scroll" data-scrollable="true" tabindex="0">
+          <div id="coach-visual" class="coach-visual" aria-live="polite"></div>
+          <div id="coach-body" class="coach-body" aria-live="polite"></div>
+          <button id="coach-ai" class="btn tutor-request">Find me a next step</button>
+          <p id="ai-status" class="small-note" aria-live="polite"></p>
+        </div>
         <div class="coach-bottom">
-          <button id="coach-say" class="btn btn-mode">SAY IT</button>
-          <button id="coach-continue" class="btn btn-start">CONTINUE</button>
+          <button id="coach-say" class="btn btn-mode">Listen</button>
+          <button id="coach-continue" class="btn btn-start">Back to puzzle</button>
         </div>
       </section>
     </div>

@@ -5,7 +5,7 @@ const SVG_HEAD =
   "xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120' preserveAspectRatio='xMidYMid meet' shape-rendering='geometricPrecision' text-rendering='geometricPrecision'";
 
 function wrap(inner: string): string {
-  return `<svg ${SVG_HEAD} role='img'>${inner}</svg>`;
+  return `<svg ${SVG_HEAD} role='img'>${inner.replaceAll("currentColor", "#f2f7ff")}</svg>`;
 }
 
 function frame(inner: string): string {
@@ -71,39 +71,102 @@ function lessonScene(inner: string, altText: string): VisualAssetSpec {
   };
 }
 
+export function renderCountingSequence(start: number, step: number): VisualAssetSpec {
+  const values = [start, start + step, start + 2 * step];
+  const cards = values.map((value, index) => {
+    const x = 24 + index * 72;
+    return `<rect data-number-card='${value}' x='${x}' y='38' width='48' height='44' rx='10' fill='currentColor' fill-opacity='0.12' stroke='currentColor' stroke-width='2'/>${svgSingleLineText(x + 24, 68, String(value), { size: 24, maxWidth: 40 })}`;
+  }).join("");
+  const arrows = [78, 150].map((x) => `<line x1='${x}' y1='60' x2='${x + 12}' y2='60' stroke='currentColor' stroke-width='2'/><polygon data-sequence-arrow='right' points='${x + 12},60 ${x + 7},56 ${x + 7},64' fill='currentColor'/>`).join("");
+  return {
+    kind: "lesson",
+    svg: wrap(frame(`${cards}${arrows}`)),
+    altText: `Number cards ${values.join(", ")} in order, with arrows pointing from left to right`
+  };
+}
+
+export function renderArithmeticCounters(left: number, right: number, operation: "+" | "-"): VisualAssetSpec {
+  const counter = (x: number, y: number, removed: boolean, group: string) => `
+    <circle data-counter-group='${group}' data-removed='${removed}' cx='${x}' cy='${y}' r='6' fill='currentColor' fill-opacity='${removed ? 0.12 : 0.7}' stroke='currentColor' stroke-width='1.5'/>
+    ${removed ? `<path data-take-away='true' d='M ${x - 5} ${y - 5} L ${x + 5} ${y + 5} M ${x + 5} ${y - 5} L ${x - 5} ${y + 5}' fill='none' stroke='currentColor' stroke-width='2'/>` : ""}
+  `;
+  const expression = svgSingleLineText(120, 29, `${left} ${operation} ${right} = ?`, { size: 18, maxWidth: 190 });
+  let counters: string;
+  if (operation === "+") {
+    const group = (count: number, x: number, name: string) =>
+      `<rect x='${x - 15}' y='38' width='70' height='63' rx='10' fill='none' stroke='currentColor' stroke-opacity='0.3'/>`
+      + Array.from({ length: count }, (_, i) => counter(x + (i % 3) * 20, 50 + Math.floor(i / 3) * 19, false, name)).join("");
+    counters = `${group(left, 38, "left")}${svgSingleLineText(120, 76, "+", { size: 26, maxWidth: 30 })}${group(right, 162, "right")}`;
+  } else {
+    // Cross out part of the original set, not a second unrelated set of objects.
+    counters = `<rect x='23' y='38' width='194' height='63' rx='10' fill='none' stroke='currentColor' stroke-opacity='0.3'/>`
+      + Array.from({ length: left }, (_, i) => counter(56 + (i % 5) * 32, 55 + Math.floor(i / 5) * 28, i >= left - right, "start")).join("");
+  }
+  return {
+    kind: "lesson",
+    svg: wrap(frame(`${expression}${counters}`)),
+    altText: operation === "+"
+      ? `Two groups of counters: ${left} on the left and ${right} on the right, with a plus sign`
+      : `Start with ${left} counters. ${right} of those counters are crossed out to show taking them away`
+  };
+}
+
+export function renderSideCountShape(name: string, sides: number): VisualAssetSpec {
+  const angleOffset = sides === 4 ? -Math.PI / 4 : -Math.PI / 2;
+  const vertices = Array.from({ length: sides }, (_, i) => {
+    const angle = angleOffset + i * 2 * Math.PI / sides;
+    return `${120 + 38 * Math.cos(angle)},${66 + 38 * Math.sin(angle)}`;
+  }).join(" ");
+  return {
+    kind: "lesson",
+    svg: wrap(frame(`<polygon data-shape-outline='true' points='${vertices}' fill='currentColor' fill-opacity='0.1' stroke='currentColor' stroke-width='3' stroke-linejoin='round'/>`)),
+    altText: `Outline of a ${name}. Follow its edge to count the sides`
+  };
+}
+
 export function renderMaze(seed: number, turns?: { leftTurns?: number; rightTurns?: number }): VisualAssetSpec {
   const leftTurns = turns?.leftTurns ?? 1 + (seed % 4);
   const rightTurns = turns?.rightTurns ?? 1 + ((seed >> 1) % 3);
-  const totalTurns = leftTurns + rightTurns;
-  const routePoints = [
-    [24, 94],
-    [62, 94],
-    [62, 74],
-    [102, 74],
-    [102, 52],
-    [144, 52],
-    [144, 30],
-    [188, 30],
-    [188, 16]
-  ].slice(0, totalTurns + 2);
-  const finishPoint = routePoints[routePoints.length - 1] as number[];
-
+  const turnOrder: number[] = [];
+  let left = leftTurns;
+  let right = rightTurns;
+  while (left > 0 || right > 0) {
+    if (left > 0) { turnOrder.push(-1); left--; }
+    if (right > 0) { turnOrder.push(1); right--; }
+  }
+  // Shortening each leg keeps consecutive same-way turns in an open spiral.
+  const raw: Array<[number, number]> = [[0, 0]];
+  const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  let heading = 0;
+  for (let i = 0; i <= turnOrder.length; i++) {
+    if (i > 0) heading = (heading + turnOrder[i - 1] + 4) % 4;
+    const [dx, dy] = directions[heading];
+    const length = turnOrder.length + 2 - i;
+    const [x, y] = raw[raw.length - 1];
+    raw.push([x + dx * length, y + dy * length]);
+  }
+  // Space the grid coordinates evenly: turns stay exact and short legs stay readable.
+  const xs = [...new Set(raw.map(([x]) => x))].sort((a, b) => a - b);
+  const ys = [...new Set(raw.map(([, y]) => y))].sort((a, b) => a - b);
+  const routePoints = raw.map(([x, y]) => [
+    xs.length === 1 ? 120 : 32 + xs.indexOf(x) * 176 / (xs.length - 1),
+    ys.length === 1 ? 70 : 42 + ys.indexOf(y) * 56 / (ys.length - 1)
+  ]);
   const path = routePoints.map(([x, y]) => `${x},${y}`).join(" ");
-  const cornerDots = routePoints
-    .slice(1, -1)
-    .map(([x, y], idx) => `<circle cx='${x}' cy='${y}' r='3.5' fill='currentColor' fill-opacity='${0.55 + (idx % 2) * 0.2}'/>`)
-    .join("");
-
+  const arrows = routePoints.slice(1).map(([x, y], i) => {
+    const [px, py] = routePoints[i];
+    const dx = Math.sign(x - px), dy = Math.sign(y - py);
+    const cx = (x + px) / 2, cy = (y + py) / 2;
+    return `<polygon points='${cx + dx * 4},${cy + dy * 4} ${cx - dx * 3 - dy * 3},${cy - dy * 3 + dx * 3} ${cx - dx * 3 + dy * 3},${cy - dy * 3 - dx * 3}' fill='currentColor'/>`;
+  }).join("");
+  const endpoint = (point: number[], text: string) => `<circle cx='${point[0]}' cy='${point[1]}' r='6' fill='currentColor'/>${svgSingleLineText(point[0], point[1] + 3, text, { size: 8, fill: "#15202b" })}`;
   const inner = `
-    ${badge(18, 14, `L ${leftTurns}`)}
-    ${badge(72, 14, `R ${rightTurns}`)}
-    <polyline points='${path}' fill='none' stroke='currentColor' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/>
-    <polyline points='${path}' fill='none' stroke='currentColor' stroke-opacity='0.18' stroke-width='16' stroke-linecap='round' stroke-linejoin='round'/>
-    ${cornerDots}
-    <circle cx='${routePoints[0][0]}' cy='${routePoints[0][1]}' r='6' fill='currentColor'/>
-    <circle cx='${finishPoint[0]}' cy='${finishPoint[1]}' r='7' fill='none' stroke='currentColor' stroke-width='3'/>
-    ${outlinedText(routePoints[0][0], routePoints[0][1] - 10, "START", 8)}
-    ${outlinedText(finishPoint[0], finishPoint[1] - 10, "FINISH", 8)}
+    ${badge(18, 14, "S = START")}
+    ${badge(130, 14, "F = FINISH")}
+    <polyline points='${path}' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/>
+    ${arrows}
+    ${endpoint(routePoints[0], "S")}
+    ${endpoint(routePoints[routePoints.length - 1], "F")}
   `;
 
   return {
@@ -115,8 +178,8 @@ export function renderMaze(seed: number, turns?: { leftTurns?: number; rightTurn
 
 export function renderVenn(aOnly: number, both: number, bOnly: number): VisualAssetSpec {
   const inner = `
-    <circle cx='94' cy='66' r='30' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>
-    <circle cx='146' cy='66' r='30' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>
+    <circle cx='98' cy='66' r='36' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>
+    <circle cx='142' cy='66' r='36' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>
     ${badge(70, 20, "A")}
     ${badge(150, 20, "B")}
     ${outlinedText(83, 70, String(aOnly), 15)}
@@ -142,7 +205,7 @@ export function renderPictograph(
     .map((count, idx) => {
       const y = 42 + idx * 24;
       const icons = Array.from({ length: count })
-        .map((_, iconIndex) => starIcon(76 + iconIndex * 22, y - 4, 6.5))
+        .map((_, iconIndex) => starIcon(76 + iconIndex * Math.min(22, 128 / Math.max(1, count - 1)), y - 4, 6.5))
         .join("");
       return `
         ${badge(18, y - 12, labels[idx] ?? String.fromCharCode(65 + idx))}
@@ -166,10 +229,10 @@ export function renderPictograph(
 
 export function renderCube(filledFaces: number): VisualAssetSpec {
   const markPositions = [
-    [86, 42],
-    [117, 37],
+    [110, 37],
     [88, 70],
     [133, 58],
+    [89, 38],
     [147, 73]
   ];
   const marks = markPositions
@@ -180,20 +243,18 @@ export function renderCube(filledFaces: number): VisualAssetSpec {
     <polygon points='62,38 110,22 164,38 116,54' fill='currentColor' fill-opacity='0.05' stroke='currentColor' stroke-width='2.5'/>
     <polygon points='62,38 62,84 116,100 116,54' fill='currentColor' fill-opacity='0.03' stroke='currentColor' stroke-width='2.5'/>
     <polygon points='116,54 116,100 164,84 164,38' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>
-    <line x1='110' y1='22' x2='110' y2='68' stroke='currentColor' stroke-opacity='0.28' stroke-width='1.5'/>
-    <line x1='84' y1='30' x2='84' y2='92' stroke='currentColor' stroke-opacity='0.18' stroke-width='1.5'/>
     ${marks}
   `;
   return {
     kind: "cube",
     svg: wrap(frame(inner)),
-    altText: `Cube drawing with ${filledFaces} marked squares`
+    altText: `Cube drawing with ${Math.max(0, Math.min(filledFaces, markPositions.length))} marked squares on three visible faces`
   };
 }
 
 export function renderCuboid(markedFaces: number): VisualAssetSpec {
   const faceMarks = [
-    [82, 42],
+    [94, 35],
     [126, 38],
     [83, 74],
     [153, 61]
@@ -206,15 +267,12 @@ export function renderCuboid(markedFaces: number): VisualAssetSpec {
     <polygon points='54,36 118,20 180,36 116,52' fill='currentColor' fill-opacity='0.05' stroke='currentColor' stroke-width='2.5'/>
     <polygon points='54,36 54,88 116,104 116,52' fill='currentColor' fill-opacity='0.03' stroke='currentColor' stroke-width='2.5'/>
     <polygon points='116,52 116,104 180,88 180,36' fill='currentColor' fill-opacity='0.08' stroke='currentColor' stroke-width='2.5'/>
-    <line x1='86' y1='28' x2='86' y2='96' stroke='currentColor' stroke-opacity='0.16' stroke-width='1.5'/>
-    <line x1='148' y1='28' x2='148' y2='96' stroke='currentColor' stroke-opacity='0.16' stroke-width='1.5'/>
-    <line x1='54' y1='62' x2='180' y2='62' stroke='currentColor' stroke-opacity='0.16' stroke-width='1.5'/>
     ${marks}
   `;
   return {
     kind: "cube",
     svg: wrap(frame(inner)),
-    altText: `Cuboid drawing with ${markedFaces} marked rectangular faces`
+    altText: `Cuboid drawing with ${Math.max(0, Math.min(markedFaces, faceMarks.length))} rectangular marks on three visible faces`
   };
 }
 
@@ -231,21 +289,19 @@ export function renderSymmetry(pattern: number[]): VisualAssetSpec {
 }
 
 export function renderBrokenLine(lengths: number[]): VisualAssetSpec {
-  const unitX = 14;
-  const unitY = 10;
-  const directions = [
-    [1, 0],
-    [0, -1],
-    [1, 0],
-    [0, 1]
-  ];
-  const points: Array<[number, number]> = [[24, 92]];
-
+  const directions = [[1, 0], [0, -1], [1, 0], [0, 1]];
+  const raw: Array<[number, number]> = [[0, 0]];
   lengths.forEach((len, index) => {
     const [dx, dy] = directions[index % directions.length];
-    const [x, y] = points[points.length - 1] as [number, number];
-    points.push([x + dx * len * unitX, y + dy * len * unitY]);
+    const [x, y] = raw[raw.length - 1];
+    raw.push([x + dx * len, y + dy * len]);
   });
+  const xs = raw.map(([x]) => x), ys = raw.map(([, y]) => y);
+  const minX = Math.min(...xs), minY = Math.min(...ys);
+  const width = Math.max(...xs) - minX, height = Math.max(...ys) - minY;
+  // One scale for both axes preserves lengths, with room for dimension labels.
+  const scale = Math.min(150 / Math.max(1, width), 56 / Math.max(1, height));
+  const points = raw.map(([x, y]) => [24 + (x - minX) * scale, 40 + (y - minY) * scale]);
 
   const dimensionLines = lengths
     .map((len, index) => {
@@ -286,24 +342,24 @@ export function renderBrokenLine(lengths: number[]): VisualAssetSpec {
 }
 
 export function renderRegionCompare(leftArea: number, rightArea: number): VisualAssetSpec {
-  const columnsA = Math.max(3, Math.min(8, Math.round(leftArea / 9)));
-  const columnsB = Math.max(3, Math.min(8, Math.round(rightArea / 9)));
-  const cell = 10;
-  const rows = 4;
-  const grid = (x: number, cols: number, label: string) => {
-    const cells = Array.from({ length: cols * rows })
-      .map((_, index) => {
-        const col = index % cols;
-        const row = Math.floor(index / cols);
-        return `<rect x='${x + col * cell}' y='${34 + row * cell}' width='${cell}' height='${cell}' fill='currentColor' fill-opacity='0.06' stroke='currentColor' stroke-opacity='0.45' stroke-width='1'/>`;
-      })
-      .join("");
-    return `${cells}${badge(x + cols * cell / 2 - 14, 82, label)}`;
+  // Preserve the ratio exactly; rounded column counts can turn unequal areas into a tie.
+  const scale = 80 / Math.max(8, leftArea, rightArea);
+  const unitGrid = Math.max(leftArea, rightArea) <= 8 && Number.isInteger(leftArea) && Number.isInteger(rightArea);
+  const region = (x: number, amount: number, name: string) => {
+    const width = amount * scale;
+    const height = unitGrid ? 3 * scale : 34;
+    const grid = unitGrid
+      ? Array.from({ length: Math.max(0, amount - 1) }, (_, i) => `<line x1='${x + (i + 1) * scale}' y1='40' x2='${x + (i + 1) * scale}' y2='${40 + height}' stroke='currentColor' stroke-width='1'/>`).join("")
+        + [1, 2].map((row) => `<line x1='${x}' y1='${40 + row * scale}' x2='${x + width}' y2='${40 + row * scale}' stroke='currentColor' stroke-width='1'/>`).join("")
+      : "";
+    return `<rect data-region='${name}' x='${x}' y='40' width='${width}' height='${height}' fill='currentColor' fill-opacity='0.12' stroke='currentColor' stroke-width='2'/>${grid}${badge(x + width / 2 - 11, 84, name)}`;
   };
   return {
     kind: "region_compare",
-    svg: wrap(frame(`${grid(28, columnsA, "A")}${grid(136, columnsB, "B")}`)),
-    altText: `Region A has ${rows} by ${columnsA} unit squares and region B has ${rows} by ${columnsB} unit squares`
+    svg: wrap(frame(`${region(28, leftArea, "A")}${region(132, rightArea, "B")}`)),
+    altText: unitGrid
+      ? `Same-height regions with 3 rows of unit squares: A has ${leftArea} columns, B has ${rightArea} columns`
+      : `Same-height regions: A has width ${leftArea} units and B has width ${rightArea} units`
   };
 }
 
@@ -358,6 +414,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
           <rect x='84' y='32' width='38' height='26' rx='8' fill='none' stroke='currentColor' stroke-width='3'/>
           <rect x='154' y='32' width='48' height='26' rx='8' fill='none' stroke='currentColor' stroke-width='3'/>
           <text x='44' y='50' font-size='16' fill='currentColor'>3</text>
+          <text x='70' y='50' font-size='16' fill='currentColor'>+</text>
           <text x='100' y='50' font-size='16' fill='currentColor'>4</text>
           <text x='136' y='50' font-size='18' fill='currentColor'>=</text>
           <text x='172' y='50' font-size='16' fill='currentColor'>7</text>
@@ -381,7 +438,7 @@ export function renderLessonScene(skillId: SkillId, seed: number): VisualAssetSp
       return lessonScene(
         `
           <circle cx='84' cy='56' r='28' fill='none' stroke='currentColor' stroke-width='3'/>
-          <path d='M84 56 L84 28 A28 28 0 0 1 108 70 Z' fill='currentColor'/>
+          <path d='M84 56 L84 28 A28 28 0 0 1 112 56 Z' fill='currentColor'/>
           <line x1='84' y1='28' x2='84' y2='84' stroke='currentColor' stroke-width='2'/>
           <line x1='56' y1='56' x2='112' y2='56' stroke='currentColor' stroke-width='2'/>
           ${svgTextBlock(164, 56, "equal parts", { size: 15, minSize: 8, maxWidth: 86, maxLines: 2 })}

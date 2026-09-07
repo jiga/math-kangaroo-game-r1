@@ -33,6 +33,32 @@ export interface BandCoverageMap {
   curriculum: CoverageRow[];
 }
 
+type CoverageMapInput = Omit<BandCoverageMap, "bandId" | "grades"> & { bandId: string; grades: number[] };
+
+export function parseBandCoverageMap(input: CoverageMapInput): BandCoverageMap {
+  const { bandId } = input;
+  if (bandId !== "g12" && bandId !== "g34" && bandId !== "g56" && bandId !== "g78" && bandId !== "g910" && bandId !== "g1112") {
+    throw new Error(`Unknown coverage band: ${bandId}`);
+  }
+  const grades = input.grades.map((grade): Grade => {
+    if (grade !== 1 && grade !== 2 && grade !== 3 && grade !== 4 && grade !== 5 && grade !== 6 && grade !== 7 && grade !== 8 && grade !== 9 && grade !== 10 && grade !== 11 && grade !== 12) {
+      throw new Error(`Invalid coverage grade: ${grade}`);
+    }
+    if (gradeToBand(grade) !== bandId) throw new Error(`Grade ${grade} does not belong to ${bandId}`);
+    return grade;
+  });
+  if (!grades.length || new Set(grades).size !== grades.length) throw new Error(`Invalid grades for ${bandId}`);
+  if (!input.curriculum.length || new Set(input.curriculum.map((row) => row.skillId)).size !== input.curriculum.length) {
+    throw new Error(`Empty or duplicate curriculum skills for ${bandId}`);
+  }
+  for (const row of input.curriculum) {
+    if (!row.skillId || !row.lessonTopic || !Number.isInteger(row.requiredFamilies) || row.requiredFamilies < 1 || !Number.isInteger(row.requiredTemplates) || row.requiredTemplates < row.requiredFamilies) {
+      throw new Error(`Invalid curriculum requirements for ${row.skillId}`);
+    }
+  }
+  return { ...input, bandId, grades };
+}
+
 export type DraftQuestion = {
   prompt: string;
   correct: string;
@@ -133,6 +159,9 @@ export function pointTierByIndex(index: number, total: number, distribution = DE
 }
 
 export function numericDistractors(correct: number, offsets: number[], min = -999, max = 9999): string[] {
+  if (![correct, min, max, ...offsets].every(Number.isFinite) || min > max) {
+    throw new Error("Numeric choices require finite values and ordered bounds");
+  }
   const out: string[] = [];
   const seen = new Set<string>([String(correct)]);
   for (const offset of offsets) {
@@ -144,7 +173,9 @@ export function numericDistractors(correct: number, offsets: number[], min = -99
     }
   }
   let step = 1;
+  const limit = Math.ceil(Math.max(Math.abs(correct - min), Math.abs(correct - max))) + 1;
   while (out.length < 4) {
+    if (step > limit) throw new Error("Numeric choice bounds cannot supply four distractors");
     for (const delta of [step, -step, step + 1, -(step + 1)]) {
       const value = Math.max(min, Math.min(max, correct + delta));
       const text = String(value);
@@ -159,12 +190,32 @@ export function numericDistractors(correct: number, offsets: number[], min = -99
   return out.slice(0, 4);
 }
 
+// Compare decimal and fractional values exactly, not just their display strings.
+export function optionValueKey(option: string): string {
+  const text = option.trim();
+  const match = /^([+-]?\d+(?:\.\d+)?)(?:\/([+-]?\d+))?(%)?$/.exec(text);
+  if (!match) return `text:${text}`;
+  const [whole, decimals = ""] = match[1].split(".");
+  let numerator = BigInt(`${whole}${decimals}`);
+  let denominator = 10n ** BigInt(decimals.length) * BigInt(match[2] || "1") * (match[3] ? 100n : 1n);
+  if (denominator === 0n) throw new Error(`Invalid numeric option: ${option}`);
+  if (denominator < 0n) {
+    numerator = -numerator;
+    denominator = -denominator;
+  }
+  let a = numerator < 0n ? -numerator : numerator;
+  let b = denominator;
+  while (b !== 0n) [a, b] = [b, a % b];
+  return `number:${numerator / a}/${denominator / a}`;
+}
+
 export function textDistractors(correct: string, options: string[]): string[] {
   const out: string[] = [];
-  const seen = new Set<string>([correct]);
+  const seen = new Set<string>([optionValueKey(correct)]);
   for (const option of options) {
-    if (!seen.has(option)) {
-      seen.add(option);
+    const key = optionValueKey(option);
+    if (!seen.has(key)) {
+      seen.add(key);
       out.push(option);
     }
     if (out.length === 4) break;
@@ -172,8 +223,9 @@ export function textDistractors(correct: string, options: string[]): string[] {
   const fallbacks = ["none", "all", "cannot be determined", "a different choice", "not enough info"];
   for (const fallback of fallbacks) {
     if (out.length === 4) break;
-    if (!seen.has(fallback)) {
-      seen.add(fallback);
+    const key = optionValueKey(fallback);
+    if (!seen.has(key)) {
+      seen.add(key);
       out.push(fallback);
     }
   }
@@ -199,8 +251,17 @@ export function lcm(a: number, b: number): number {
 }
 
 export function simplifyFraction(numerator: number, denominator: number): [number, number] {
+  if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator) || denominator === 0) {
+    throw new Error("Fractions require integer terms and a nonzero denominator");
+  }
   const factor = gcd(numerator, denominator);
-  return [numerator / factor, denominator / factor];
+  const sign = denominator < 0 ? -1 : 1;
+  return [sign * numerator / factor, sign * denominator / factor];
+}
+
+export function rationalText(numerator: number, denominator: number): string {
+  const [n, d] = simplifyFraction(numerator, denominator);
+  return d === 1 ? String(n) : fractionText(n, d);
 }
 
 export function formatDecimal(value: number): string {

@@ -25,6 +25,7 @@ pnpm-debug.log*
 
 # Internal notes
 progress.md
+/tasks/
 
 # Local OCR / debug artifacts
 /index-legacy.html

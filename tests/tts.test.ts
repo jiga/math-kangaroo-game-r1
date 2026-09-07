@@ -2,6 +2,26 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { TTSQueue } from "../src/audio/ttsQueue";
 
+test("cancelling speech stops the browser speaker and preserves math terminology", () => {
+  const root = globalThis as unknown as { PluginMessageHandler?: unknown; speechSynthesis?: unknown };
+  const plugin = root.PluginMessageHandler;
+  const speech = root.speechSynthesis;
+  let stopped = 0;
+  let message = "";
+  try {
+    root.PluginMessageHandler = { postMessage: (raw: string) => { message = raw; } };
+    root.speechSynthesis = { cancel: () => { stopped++; } };
+    const queue = new TTSQueue();
+    queue.speak("Change the function and compare the graph.");
+    queue.cancelAll();
+    assert.equal(stopped, 1);
+    assert.match(message, /Change the function and compare the graph/);
+  } finally {
+    root.PluginMessageHandler = plugin;
+    root.speechSynthesis = speech;
+  }
+});
+
 test("tts queue sends child-safe speech prompt through PluginMessageHandler", () => {
   const sent: string[] = [];
   const originalPlugin = (globalThis as unknown as { PluginMessageHandler?: { postMessage?: (msg: string) => void } }).PluginMessageHandler;

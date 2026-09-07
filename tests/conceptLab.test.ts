@@ -41,6 +41,7 @@ test("learn concept lab includes scaffolded check and transfer steps", () => {
   const question = template!.generate({
     templateId: template!.id,
     grade: 1,
+    bandId: template!.bandId,
     pointTier: template!.pointTier,
     variantSeed: 42
   });
@@ -60,6 +61,7 @@ test("remediation concept lab turns a miss into a follow-up check", () => {
   const question = template!.generate({
     templateId: template!.id,
     grade: 2,
+    bandId: template!.bandId,
     pointTier: template!.pointTier,
     variantSeed: 99
   });

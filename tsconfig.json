@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2020",
+    // ES2020 syntax output; ES2021 APIs such as replaceAll need native support or a polyfill.
+    // Library declarations do not add runtime polyfills.
+    "lib": ["ES2021", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,

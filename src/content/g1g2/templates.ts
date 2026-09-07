@@ -8,12 +8,15 @@ import type {
   VisualAssetSpec
 } from "../../domain/types";
 import {
+  renderArithmeticCounters,
   renderBrokenLine,
+  renderCountingSequence,
   renderCube,
   renderCuboid,
   renderMaze,
   renderPictograph,
   renderRegionCompare,
+  renderSideCountShape,
   renderSymmetry,
   renderVenn
 } from "../../render/visualQuestionRenderer";
@@ -36,12 +39,12 @@ type QuestionFamily = {
   generate: (ctx: GenerationContext, rng: SeededRng) => DraftQuestion;
 };
 
-function numericDistractors(correct: number, offsets: number[], min = 0): string[] {
+function numericDistractors(correct: number, offsets: number[], min = 0, max = Infinity): string[] {
   const out: string[] = [];
   const seen = new Set<string>([String(correct)]);
 
   for (const offset of offsets) {
-    const value = Math.max(min, correct + offset);
+    const value = Math.min(max, Math.max(min, correct + offset));
     const text = String(value);
     if (!seen.has(text)) {
       seen.add(text);
@@ -52,7 +55,7 @@ function numericDistractors(correct: number, offsets: number[], min = 0): string
   let step = 1;
   while (out.length < 4) {
     for (const delta of [step, -step]) {
-      const value = Math.max(min, correct + delta);
+      const value = Math.min(max, Math.max(min, correct + delta));
       const text = String(value);
       if (!seen.has(text)) {
         seen.add(text);
@@ -103,6 +106,11 @@ function tierNumber(rng: SeededRng, pointTier: PointTier, low: number, mid: numb
   return rng.int(high, high + Math.max(2, Math.floor((high - low) / 2)));
 }
 
+// Counting/number-line quantities, including choices, stay in the G1-2 range.
+function countingLimit(pointTier: PointTier): number {
+  return pointTier === 5 ? 30 : 20;
+}
+
 function toQuestion(ctx: GenerationContext, skillId: SkillId, familyId: string, draft: DraftQuestion): QuestionInstance {
   const rng = new SeededRng(ctx.variantSeed ^ 0x9e3779b9);
   const packed = shuffledOptions(String(draft.correct), draft.distractors.map(String), rng);
@@ -130,30 +138,33 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
   counting_ordering: [
     {
       familyId: "forward_sequence",
+      format: "svg",
       generate: (ctx, rng) => {
-        const start = rng.int(1, ctx.grade === 1 ? 16 : 24);
         const step = ctx.pointTier === 5 ? 2 : 1;
-        const correct = start + step * 3;
+        const start = rng.int(1, countingLimit(ctx.pointTier) - step * 2);
+        const correct = `add ${step}`;
         return {
-          prompt: `What number comes next? ${start}, ${start + step}, ${start + step * 2}, ?`,
-          correct: String(correct),
-          distractors: numericDistractors(correct, [step, -step, step * 2, -step * 2]),
-          explanation: `The rule is +${step} each time, so the next number is ${correct}.`,
+          prompt: `Which counting rule matches ${start}, ${start + step}, ${start + step * 2}?`,
+          correct,
+          distractors: textDistractors(correct, [`add ${step + 1}`, `subtract ${step}`, `subtract ${step + 1}`, "keep the same number"]),
+          explanation: `Each jump adds ${step}. The same rule matches both jumps.`,
           strategyTags: ["find the step", "check every jump"],
-          trapWarning: "Do not switch rules in the middle of the sequence."
+          trapWarning: "Do not switch rules in the middle of the sequence.",
+          format: "svg",
+          visualAssetSpec: renderCountingSequence(start, step)
         };
       }
     },
     {
       familyId: "backward_sequence",
       generate: (ctx, rng) => {
-        const start = tierNumber(rng, ctx.pointTier, 8, 18, 28);
+        const start = rng.int(8, countingLimit(ctx.pointTier));
         const step = ctx.pointTier === 5 ? 2 : 1;
         const correct = start - step * 2;
         return {
           prompt: `Count backward. Fill the blank: ${start}, ${start - step}, ?, ${start - step * 3}`,
           correct: String(correct),
-          distractors: numericDistractors(correct, [step, -step, step * 2, -step * 2]),
+          distractors: numericDistractors(correct, [step, -step, step * 2, -step * 2], 0, countingLimit(ctx.pointTier)),
           explanation: `Counting backward means subtract ${step} each time, so the missing number is ${correct}.`,
           strategyTags: ["look for minus one or minus two", "say the numbers aloud"],
           trapWarning: "Backward patterns decrease, not increase."
@@ -163,14 +174,14 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     {
       familyId: "grouped_count",
       generate: (ctx, rng) => {
-        const groups = tierNumber(rng, ctx.pointTier, 3, 5, 7);
         const size = ctx.pointTier === 5 ? 5 : 2;
         const extra = rng.int(0, 3);
+        const groups = rng.int(3, Math.floor((countingLimit(ctx.pointTier) - extra) / size));
         const correct = groups * size + extra;
         return {
           prompt: `There are ${groups} groups of ${size} stars and ${extra} extra star(s). How many stars are there in all?`,
           correct: String(correct),
-          distractors: numericDistractors(correct, [size, -size, extra + 1, -(extra + 1)]),
+          distractors: numericDistractors(correct, [size, -size, extra + 1, -(extra + 1)], 0, countingLimit(ctx.pointTier)),
           explanation: `${groups} groups of ${size} make ${groups * size}. Then add ${extra} more to get ${correct}.`,
           strategyTags: ["count in equal groups", "add extras at the end"],
           trapWarning: "Count every full group before adding the leftovers."
@@ -184,11 +195,11 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       generate: (ctx, rng) => {
         const a = tierNumber(rng, ctx.pointTier, 4, 18, 45);
         const b = tierNumber(rng, ctx.pointTier, 3, 17, 44);
-        const correct = a === b ? "Equal" : a > b ? String(a) : String(b);
+        const correct = a === b ? "Equal" : a > b ? "A" : "B";
         return {
-          prompt: `Which is greater: ${a} or ${b}?`,
+          prompt: `Number A is ${a}. Number B is ${b}. Which is greater?`,
           correct,
-          distractors: textDistractors(correct, [String(a), String(b), "Equal", "Cannot tell", String(Math.max(a, b) + 1)]),
+          distractors: textDistractors(correct, ["A", "B", "Equal", "Both are zero", "Both are one"]),
           explanation: a === b ? "Both numbers are the same." : `Compare the tens first. ${Math.max(a, b)} is greater.`,
           strategyTags: ["compare tens first", "then compare ones"],
           trapWarning: "Do not look only at the last digit."
@@ -205,20 +216,23 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         const a = tensA * 10 + onesA;
         const b = tensB * 10 + onesB;
         const correct =
-          a === b ? "Equal" : a > b ? `${a} is greater` : `${b} is greater`;
+          a === b ? "Equal" : a > b ? "A is greater" : "B is greater";
         return {
-          prompt: `Which statement is true about ${a} and ${b}?`,
+          prompt: `Number A is ${a}. Number B is ${b}. Which statement is true?`,
           correct,
           distractors: textDistractors(correct, [
-            `${a} is greater`,
-            `${b} is greater`,
+            "A is greater",
+            "B is greater",
             "Equal",
-            "Cannot tell"
+            "Both are zero",
+            "Both are one"
           ]),
           explanation:
             a === b
               ? `${a} and ${b} are equal.`
-              : `Compare tens first. That tells which number is greater.`,
+              : tensA === tensB
+                ? `Both numbers have ${tensA} tens. Compare the ones: ${Math.max(onesA, onesB)} is greater, so ${Math.max(a, b)} is greater.`
+                : `Compare tens first: ${Math.max(tensA, tensB)} tens is more, so ${Math.max(a, b)} is greater.`,
           strategyTags: ["compare place value", "tens decide first"],
           trapWarning: "A bigger ones digit cannot beat a bigger tens digit."
         };
@@ -228,13 +242,13 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       familyId: "region_area_compare",
       format: "svg",
       generate: (ctx, rng) => {
-        const widthA = tierNumber(rng, ctx.pointTier, 42, 58, 74);
-        const widthB = tierNumber(rng, ctx.pointTier, 36, 56, 72);
+        const widthA = rng.int(3, 8);
+        const widthB = rng.int(3, 8);
         const correct = widthA === widthB ? "Equal" : widthA > widthB ? "A" : "B";
         return {
           prompt: "Which region has the greater area?",
           correct,
-          distractors: textDistractors(correct, ["A", "B", "Equal", "Cannot tell"]),
+          distractors: textDistractors(correct, ["A", "B", "Equal", "A is taller", "B is taller"]),
           explanation:
             widthA === widthB
               ? "The rectangles have the same height and width, so the areas are equal."
@@ -307,7 +321,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         const askTens = (ctx.variantSeed & 1) === 0;
         const correct = askTens ? tens : ones;
         return {
-          prompt: askTens ? `How many tens are in ${n}?` : `How many ones are in ${n}?`,
+          prompt: askTens ? `How many full groups of ten are in ${n}?` : `What digit is in the ones place of ${n}?`,
           correct: String(correct),
           distractors: numericDistractors(correct, [1, -1, 2, -2]),
           explanation: `${n} is ${tens} tens and ${ones} ones.`,
@@ -347,7 +361,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         const askTensDigit = rng.int(0, 1) === 0;
         const correct = askTensDigit ? tens * 10 : ones;
         return {
-          prompt: askTensDigit ? `What is the value of the digit ${tens} in ${n}?` : `What is the value of the digit ${ones} in ${n}?`,
+          prompt: askTensDigit ? `What is the value of the tens digit in ${n}?` : `What is the value of the ones digit in ${n}?`,
           correct: String(correct),
           distractors: textDistractors(String(correct), [String(tens), String(ones), String(n), String(tens * 10 + ones * 10)]),
           explanation: askTensDigit ? `The digit ${tens} is in the tens place, so its value is ${tens * 10}.` : `The digit ${ones} is in the ones place, so its value is ${ones}.`,
@@ -360,9 +374,10 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
   single_digit_add_sub: [
     {
       familyId: "fact_fluency",
+      format: "svg",
       generate: (ctx, rng) => {
-        const a = tierNumber(rng, ctx.pointTier, 1, 6, 9);
-        const b = tierNumber(rng, ctx.pointTier, 1, 5, 9);
+        const a = rng.int(ctx.pointTier === 3 ? 1 : 5, 9);
+        const b = rng.int(ctx.pointTier === 3 ? 1 : 4, 9);
         const add = (ctx.variantSeed & 1) === 0;
         const left = add ? a : Math.max(a, b);
         const right = add ? b : Math.min(a, b);
@@ -373,7 +388,9 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
           distractors: numericDistractors(correct, [1, -1, 2, -2]),
           explanation: add ? `Add ${left} and ${right} to get ${correct}.` : `Subtract ${right} from ${left} to get ${correct}.`,
           strategyTags: ["use known facts", "check the sign"],
-          trapWarning: "Read whether it is plus or minus before solving."
+          trapWarning: "Read whether it is plus or minus before solving.",
+          format: "svg",
+          visualAssetSpec: renderArithmeticCounters(left, right, add ? "+" : "-")
         };
       }
     },
@@ -381,7 +398,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       familyId: "missing_part",
       generate: (_ctx, rng) => {
         const whole = rng.int(6, 18);
-        const part = rng.int(1, whole - 2);
+        const part = rng.int(Math.max(1, whole - 9), Math.min(9, whole - 2));
         const correct = whole - part;
         return {
           prompt: `${part} + ? = ${whole}. What is the missing number?`,
@@ -396,7 +413,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     {
       familyId: "story_problem",
       generate: (ctx, rng) => {
-        const start = tierNumber(rng, ctx.pointTier, 3, 7, 12);
+        const start = rng.int(ctx.pointTier === 3 ? 3 : 7, 9);
         const change = rng.int(1, 6);
         const add = rng.int(0, 1) === 0;
         const correct = add ? start + change : start - Math.min(change, start - 1);
@@ -436,8 +453,8 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     {
       familyId: "jump_direction",
       generate: (ctx, rng) => {
-        const start = tierNumber(rng, ctx.pointTier, 3, 9, 15);
         const jump = rng.int(1, ctx.pointTier === 5 ? 6 : 4);
+        const start = rng.int(jump, countingLimit(ctx.pointTier) - jump);
         const add = rng.int(0, 1) === 0;
         const correct = add ? start + jump : start - jump;
         return {
@@ -445,7 +462,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
             ? `Start at ${start} on a number line and jump right ${jump}. Where do you land?`
             : `Start at ${start} on a number line and jump left ${jump}. Where do you land?`,
           correct: String(correct),
-          distractors: numericDistractors(correct, [1, -1, jump, -jump], 0),
+          distractors: numericDistractors(correct, [1, -1, jump, -jump], 0, countingLimit(ctx.pointTier)),
           explanation: add ? `Right on a number line means add ${jump}.` : `Left on a number line means subtract ${jump}.`,
           strategyTags: ["right means plus", "left means minus"],
           trapWarning: "Do not jump in the wrong direction."
@@ -454,9 +471,9 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     },
     {
       familyId: "missing_start",
-      generate: (_ctx, rng) => {
+      generate: (ctx, rng) => {
         const jump = rng.int(1, 5);
-        const end = rng.int(6, 20);
+        const end = rng.int(jump, countingLimit(ctx.pointTier) - jump);
         const add = rng.int(0, 1) === 0;
         const correct = add ? end - jump : end + jump;
         return {
@@ -464,7 +481,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
             ? `A jump of ${jump} to the right lands on ${end}. Where did the jump start?`
             : `A jump of ${jump} to the left lands on ${end}. Where did the jump start?`,
           correct: String(correct),
-          distractors: numericDistractors(correct, [1, -1, jump, -jump], 0),
+          distractors: numericDistractors(correct, [1, -1, jump, -jump], 0, countingLimit(ctx.pointTier)),
           explanation: `Work backward: ${add ? `${end} - ${jump}` : `${end} + ${jump}`} = ${correct}.`,
           strategyTags: ["work backward", "undo the jump"],
           trapWarning: "To find the start, reverse the direction."
@@ -639,9 +656,23 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     {
       familyId: "unit_compare",
       generate: (ctx, rng) => {
+        if (ctx.pointTier !== 5) {
+          const unit = rng.pick(["cm", "g", "mL"]);
+          const a = rng.int(1, countingLimit(ctx.pointTier));
+          const b = rng.int(1, countingLimit(ctx.pointTier));
+          const correct = a === b ? "They are equal" : a > b ? "A" : "B";
+          return {
+            prompt: `Measurement A is ${a} ${unit}. Measurement B is ${b} ${unit}. Which is greater?`,
+            correct,
+            distractors: textDistractors(correct, ["A", "B", "They are equal", "Both are zero", "The units are different"]),
+            explanation: a === b ? "The numbers and units match, so the measurements are equal." : `Both use ${unit}. ${Math.max(a, b)} is greater than ${Math.min(a, b)}.`,
+            strategyTags: ["check the units", "compare the numbers"],
+            trapWarning: "Compare the numbers directly only when the units match."
+          };
+        }
         const kind = (ctx.variantSeed + ctx.grade) % 3;
         if (kind === 0) {
-          const cm = tierNumber(rng, ctx.pointTier, 40, 85, 98);
+          const cm = rng.int(40, 99);
           return {
             prompt: `Which is longer: 1 meter or ${cm} centimeters?`,
             correct: "1 meter",
@@ -652,7 +683,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
           };
         }
         if (kind === 1) {
-          const grams = tierNumber(rng, ctx.pointTier, 350, 780, 980);
+          const grams = rng.int(350, 999);
           return {
             prompt: `Which is heavier: 1 kilogram or ${grams} grams?`,
             correct: "1 kilogram",
@@ -662,7 +693,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
             trapWarning: "A bigger number is not bigger unless the units match."
           };
         }
-        const ml = tierNumber(rng, ctx.pointTier, 420, 760, 960);
+        const ml = rng.int(420, 999);
         return {
           prompt: `Which holds more: 1 liter or ${ml} milliliters?`,
           correct: "1 liter",
@@ -710,13 +741,17 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     },
     {
       familyId: "same_unit_sum",
-      generate: (_ctx, rng) => {
-        const a = rng.int(8, 30);
-        const b = rng.int(6, 28);
+      generate: (ctx, rng) => {
+        const a = rng.int(2, countingLimit(ctx.pointTier) - 2);
+        const b = rng.int(1, countingLimit(ctx.pointTier) - a);
         const unit = rng.pick(["cm", "g", "mL"]);
         const correct = a + b;
         return {
-          prompt: `A ribbon is ${a} ${unit} long and another ribbon is ${b} ${unit} long. How long are they together?`,
+          prompt: unit === "cm"
+            ? `A ribbon is ${a} cm long and another ribbon is ${b} cm long. How many centimeters long are they together?`
+            : unit === "g"
+              ? `A stone weighs ${a} g and another stone weighs ${b} g. How many grams do they weigh together?`
+              : `One cup holds ${a} mL of juice and another holds ${b} mL. How many milliliters of juice are there altogether?`,
           correct: String(correct),
           distractors: numericDistractors(correct, [1, -1, a - b, b - a], 0),
           explanation: `The units already match, so add: ${a} + ${b} = ${correct}.`,
@@ -730,8 +765,8 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
     {
       familyId: "growing_number_pattern",
       generate: (ctx, rng) => {
-        const step = tierNumber(rng, ctx.pointTier, 1, 3, 5);
-        const start = tierNumber(rng, ctx.pointTier, 1, 7, 16);
+        const step = rng.int(1, ctx.pointTier === 3 ? 3 : 5);
+        const start = rng.int(1, countingLimit(ctx.pointTier) - 2 * step);
         const correct = `add ${step}`;
         return {
           prompt: `What is the rule for ${start}, ${start + step}, ${start + step * 2}?`,
@@ -887,6 +922,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
   shape_properties: [
     {
       familyId: "count_sides",
+      format: "svg",
       generate: (_ctx, rng) => {
         const shape = rng.pick([
           { name: "triangle", value: 3 },
@@ -900,7 +936,9 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
           distractors: numericDistractors(shape.value, [1, -1, 2, -2], 1),
           explanation: `A ${shape.name} has ${shape.value} sides.`,
           strategyTags: ["count the edges", "match shape name to side count"],
-          trapWarning: "Sides and corners are related, but the question asks for one of them."
+          trapWarning: "Sides and corners are related, but the question asks for one of them.",
+          format: "svg",
+          visualAssetSpec: renderSideCountShape(shape.name, shape.value)
         };
       }
     },
@@ -926,7 +964,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       familyId: "shape_description",
       generate: (_ctx, rng) => {
         const set = rng.pick([
-          { prompt: "Which shape has 4 equal sides?", correct: "square", pool: ["square", "triangle", "rectangle", "circle", "pentagon"] },
+          { prompt: "Which shape always has 4 equal sides?", correct: "square", pool: ["square", "triangle", "rectangle", "circle", "pentagon"] },
           { prompt: "Which shape has 3 sides?", correct: "triangle", pool: ["triangle", "square", "rectangle", "circle", "hexagon"] },
           { prompt: "Which shape has no corners?", correct: "circle", pool: ["circle", "triangle", "square", "rectangle", "pentagon"] }
         ]);
@@ -965,7 +1003,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       familyId: "shape_make",
       generate: (_ctx, rng) => {
         const set = rng.pick([
-          { prompt: "Two equal triangles can make which larger shape?", correct: "square", pool: ["square", "circle", "pentagon", "line", "none"] },
+          { prompt: "Two triangles made by cutting a square along its diagonal fit back together to make which shape?", correct: "square", pool: ["square", "circle", "pentagon", "line", "none"] },
           { prompt: "Two smaller squares can join to make which rectangle?", correct: "1 by 2 rectangle", pool: ["1 by 2 rectangle", "triangle", "circle", "cube", "none"] },
           { prompt: "A square cut along a diagonal makes how many triangles?", correct: "2", pool: ["1", "2", "3", "4", "5"] }
         ]);
@@ -1070,8 +1108,8 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       generate: (_ctx, rng) => {
         const items = [
           { prompt: "Rolling a 7 on a normal die is", correct: "impossible" },
-          { prompt: "The sun rising tomorrow is", correct: "certain" },
-          { prompt: "Getting wet in the rain without an umbrella is", correct: "likely" }
+          { prompt: "Picking a blue marble from a bag containing only blue marbles is", correct: "certain" },
+          { prompt: "Picking blue at random from a bag with 9 blue marbles and 1 red marble is", correct: "likely" }
         ];
         const pick = items[rng.int(0, items.length - 1)];
         return {
@@ -1119,7 +1157,9 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       familyId: "largest_row",
       format: "svg",
       generate: (_ctx, rng) => {
-        const groups = [rng.int(1, 4), rng.int(2, 5), rng.int(1, 4)];
+        const groups = [rng.int(1, 4), rng.int(1, 4), rng.int(1, 4)];
+        const greatestRow = rng.int(0, 2);
+        groups[greatestRow] = Math.max(...groups) + 1;
         const labels = ["A", "B", "C"];
         const correct = labels[groups.indexOf(Math.max(...groups))];
         return {
@@ -1385,7 +1425,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         return {
           prompt: `What time is half an hour after ${start}?`,
           correct,
-          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${hour + 1}:00`, `${hour + 1}:30`, `${hour - 1}:30`]),
+          distractors: textDistractors(correct, [`${hour}:00`, `${hour}:30`, `${hour + 1}:00`, `${hour + 1}:30`, `${((hour + 10) % 12) + 1}:30`]),
           explanation: `Half an hour moves from :00 to :30 or from :30 to the next hour.`,
           strategyTags: ["half an hour means :30", "watch when the hour changes"],
           trapWarning: "From :30, the next half-hour lands on the next full hour."
@@ -1433,8 +1473,8 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       generate: (_ctx, rng) => {
         const pick = rng.pick([
           { shape: "square", count: 4 },
-          { shape: "rectangle", count: 2 },
-          { shape: "triangle", count: 1 }
+          { shape: "rectangle that is not a square", count: 2 },
+          { shape: "triangle with exactly two equal sides", count: 1 }
         ]);
         return {
           prompt: `How many lines of symmetry does a ${pick.shape} have?`,
@@ -1482,7 +1522,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
       familyId: "same_value_both_sides",
       generate: (_ctx, rng) => {
         const left = rng.int(2, 8);
-        const rightAdd = rng.int(1, 5);
+        const rightAdd = rng.int(1, Math.min(5, left));
         const correct = left - rightAdd;
         return {
           prompt: `${left} = ? + ${rightAdd}. What is ?`,
@@ -1517,7 +1557,7 @@ const FAMILY_LIBRARY: Record<SkillId, QuestionFamily[]> = {
         const weights = [start, start + 1, start + 2, start + 3, start + 4];
         const correct = start + 2;
         return {
-          prompt: `Five toys weigh ${weights.join(" g, ")} g. Two different pairs have the same total weight. Which weight is left over?`,
+          prompt: `Five toys weigh ${weights.join(" g, ")} g. Make two pairs using four toys. Each pair weighs ${weights[0] + weights[4]} g. Which weight is left over?`,
           correct: `${correct} g`,
           distractors: textDistractors(`${correct} g`, weights.map((weight) => `${weight} g`)),
           explanation: `${weights[0]} + ${weights[4]} = ${weights[1]} + ${weights[3]}, so the middle weight ${correct} g is left over.`,
@@ -1534,13 +1574,13 @@ const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
     {
       familyId: "before_after_number",
       generate: (ctx, rng) => {
-        const n = tierNumber(rng, ctx.pointTier, 4, 18, 28);
+        const n = rng.int(4, countingLimit(ctx.pointTier) - 1);
         const askBefore = (ctx.variantSeed & 1) === 0;
         const correct = askBefore ? n - 1 : n + 1;
         return {
           prompt: askBefore ? `What number comes just before ${n}?` : `What number comes just after ${n}?`,
           correct: String(correct),
-          distractors: numericDistractors(correct, [1, -1, 2, -2]),
+          distractors: numericDistractors(correct, [1, -1, 2, -2], 0, countingLimit(ctx.pointTier)),
           explanation: askBefore ? `One less than ${n} is ${correct}.` : `One more than ${n} is ${correct}.`,
           strategyTags: ["move one step only", "check before versus after"],
           trapWarning: "Before means one less. After means one more."
@@ -1552,12 +1592,17 @@ const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
     {
       familyId: "smallest_number",
       generate: (ctx, rng) => {
+        const seen = new Set<number>();
         const nums = shuffled(
           [
             tierNumber(rng, ctx.pointTier, 6, 22, 48),
             tierNumber(rng, ctx.pointTier, 7, 24, 49),
             tierNumber(rng, ctx.pointTier, 8, 26, 50)
-          ],
+          ].map((value) => {
+            while (seen.has(value)) value++;
+            seen.add(value);
+            return value;
+          }),
           rng
         );
         const askSmallest = (ctx.variantSeed & 1) === 0;
@@ -1640,16 +1685,16 @@ const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
     {
       familyId: "number_between",
       generate: (ctx, rng) => {
-        const start = tierNumber(rng, ctx.pointTier, 2, 14, 34);
         const gap = ctx.pointTier === 5 ? 2 : 1;
+        const start = rng.int(2, countingLimit(ctx.pointTier) - gap * 2);
         const correct = start + gap;
         return {
-          prompt: `Which number is between ${start} and ${start + gap * 2}?`,
+          prompt: `Which number is exactly halfway between ${start} and ${start + gap * 2}?`,
           correct: String(correct),
-          distractors: numericDistractors(correct, [gap, -gap, gap * 2, -gap * 2]),
+          distractors: numericDistractors(correct, [gap, -gap, gap * 2, -gap * 2], 0, countingLimit(ctx.pointTier)),
           explanation: `The number exactly between ${start} and ${start + gap * 2} is ${correct}.`,
           strategyTags: ["count one jump at a time", "find the middle point"],
-          trapWarning: "Between means not the first number and not the last number."
+          trapWarning: "Halfway means the same distance from both ends."
         };
       }
     }
@@ -1737,7 +1782,7 @@ const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
         return {
           prompt: `Path A is ${pathA[0]} cm + ${pathA[1]} cm. Path B is ${pathB[0]} cm + ${pathB[1]} cm. Which path is longer?`,
           correct,
-          distractors: textDistractors(correct, ["Path A", "Path B", "Equal", "Cannot tell"]),
+          distractors: textDistractors(correct, ["Path A", "Path B", "Equal", "Both are zero", "One path has no length"]),
           explanation:
             totalA === totalB
               ? `Both paths total ${totalA} cm, so they are equal.`
@@ -1774,7 +1819,7 @@ const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
           distractors: textDistractors("square", ["rectangle", "triangle", "circle", "pentagon"]),
           explanation: "A square always has 4 equal sides and 4 corners.",
           strategyTags: ["use side lengths and corners", "match both properties"],
-          trapWarning: "A rectangle has 4 corners, but its sides are not all equal."
+          trapWarning: "A rectangle has 4 corners, but its sides need not all be equal."
         };
       }
     }
@@ -1808,12 +1853,12 @@ const ADDITIONAL_FAMILIES: Partial<Record<SkillId, QuestionFamily[]>> = {
         const total = visible + rng.int(1, 2);
         const correct = total - visible;
         return {
-          prompt: `The cube has ${total} marked faces in all. ${visible} marks can be seen. How many marked faces are hidden?`,
+          prompt: `The cube has ${total} marked squares in all. ${visible} marked squares can be seen. How many marked squares are hidden?`,
           correct: String(correct),
           distractors: numericDistractors(correct, [1, -1, visible, -visible], 0),
-          explanation: `Subtract the ${visible} visible marks from the ${total} total marks. ${correct} marked face(s) are hidden.`,
+          explanation: `Subtract the ${visible} visible marks from the ${total} total marks. ${correct} marked square(s) are hidden.`,
           strategyTags: ["total minus visible", "picture the back faces"],
-          trapWarning: "Visible faces are only part of the whole cube.",
+          trapWarning: "Count marks, not faces; a face can have more than one mark.",
           format: "svg",
           visualAssetSpec: renderCube(visible)
         };

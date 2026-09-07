@@ -188,7 +188,7 @@ function pickTemplate(
 }
 
 export function buildContestQuestions(grade: Grade, seed = Date.now()): QuestionInstance[] {
-  if (grade > 2) return [];
+  if (grade !== 1 && grade !== 2) return [];
 
   const templates = buildGradeTemplates(grade);
   const rng = new SeededRng(seed);

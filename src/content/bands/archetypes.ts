@@ -1,5 +1,5 @@
 import type { BandCoverageMap, BandFamilyLibrary, BandFamilySpec, CoverageRow } from "./common";
-import { numericDistractors, textDistractors, fractionText, simplifyFraction, formatDecimal, gcd, lcm } from "./common";
+import { numericDistractors, textDistractors, fractionText, simplifyFraction, rationalText, formatDecimal, gcd, lcm } from "./common";
 import type { GenerationContext } from "../../domain/types";
 import { SeededRng } from "../g1g2/helpers";
 import {
@@ -583,9 +583,8 @@ function dataLogicFamilies(row: CoverageRow): BandFamilySpec[] {
 function logicFamilies(row: CoverageRow): BandFamilySpec[] {
   return [
     family("elimination_clues", (ctx, rng) => {
-      const correct = rng.pick(["red", "blue", "green", "yellow"]);
       return {
-        prompt: `A box is not red, not green, and not yellow. What color must it be?`,
+        prompt: `A box is one of four colors: red, blue, green, or yellow. It is not red, green, or yellow. What color must it be?`,
         correct: "blue",
         distractors: textDistractors("blue", ["red", "green", "yellow", "cannot tell"]),
         explanation: `If three colors are ruled out, the only color left is blue.`,
@@ -594,12 +593,11 @@ function logicFamilies(row: CoverageRow): BandFamilySpec[] {
       };
     }),
     family("ordering_logic", (ctx, rng) => {
-      const names = ["Ava", "Ben", "Cora", "Drew"];
       return {
-        prompt: `Ava is before Ben. Ben is before Cora. Who cannot be first?`,
+        prompt: `Ava is before Ben. Ben is before Cora. Who must have both Ava and Ben before them?`,
         correct: "Cora",
         distractors: textDistractors("Cora", ["Ava", "Ben", "Drew", "Any of them"]),
-        explanation: `Since Ava and Ben both come before Cora, Cora cannot be first.`,
+        explanation: `Chain the clues: Ava is before Ben, and both are before Cora. No position is given for Drew.`,
         strategyTags: ["chain the clues", "lock in relative order"],
         trapWarning: "Use all clues together, not one at a time."
       };
@@ -618,10 +616,10 @@ function logicFamilies(row: CoverageRow): BandFamilySpec[] {
       };
     }),
     family("set_reasoning", (ctx, rng) => {
-      const total = rng.int(12, 24);
       const circle = rng.int(4, 8);
       const both = rng.int(1, Math.min(4, circle - 1));
       const squareOnly = rng.int(3, 7);
+      const total = rng.int(Math.max(12, circle + squareOnly), 24);
       const correct = total - (circle + squareOnly);
       return {
         prompt: `There are ${total} objects. ${circle - both} are only in Circle, ${both} are in both, and ${squareOnly} are only in Square. How many are outside both sets?`,
@@ -822,7 +820,8 @@ function numberTheoryFamilies(row: CoverageRow): BandFamilySpec[] {
       return {
         prompt: `A number leaves remainder ${residue} when divided by ${divisor}. Which number could it be?`,
         correct: String(next),
-        distractors: textDistractors(String(next), [String(divisor), String(residue), String(next + 1), String(next - 1)]),
+        distractors: Array.from({ length: divisor * 5 }, (_, index) => index)
+          .filter((value) => value % divisor !== residue).slice(0, 4).map(String),
         explanation: `Numbers with remainder ${residue} have the form ${divisor}k + ${residue}.`,
         strategyTags: ["write a number as divisor times quotient plus remainder", "look for the matching residue"],
         trapWarning: "Only numbers with the same residue in the same modulus fit the pattern."
@@ -919,13 +918,14 @@ function decimalPercentFamilies(row: CoverageRow): BandFamilySpec[] {
   return [
     family("percent_of_number", (ctx, rng) => {
       const percent = rng.pick([10, 20, 25, 40, 50, 75]);
-      const base = rng.int(20, 200);
-      const correct = Math.round((base * percent) / 100);
+      const unit = 100 / gcd(percent, 100);
+      const base = unit * rng.int(Math.ceil(20 / unit), Math.floor(200 / unit));
+      const correct = (base * percent) / 100;
       return {
         prompt: `What is ${percent}% of ${base}?`,
         correct: String(correct),
         distractors: numericDistractors(correct, [percent / 5 || 2, -(percent / 10 || 1), 5, -5], 0),
-        explanation: `${percent}% means ${percent}/100, so multiply ${base} by that fraction.`,
+        explanation: `${percent}% of ${base} = ${base} × ${percent}/100 = ${correct}.`,
         strategyTags: ["turn percent into per hundred", "use easy benchmark percents"],
         trapWarning: "Percent means out of 100, not out of 10."
       };
@@ -933,7 +933,7 @@ function decimalPercentFamilies(row: CoverageRow): BandFamilySpec[] {
     family("decimal_compare", (ctx, rng) => {
       const a = Number((rng.int(11, 89) / 10).toFixed(1));
       const b = Number((rng.int(11, 89) / 10).toFixed(1));
-      const correct = a > b ? String(a) : String(b);
+      const correct = a === b ? "they are equal" : String(Math.max(a, b));
       return {
         prompt: `Which decimal is greater: ${a} or ${b}?`,
         correct,
@@ -944,20 +944,22 @@ function decimalPercentFamilies(row: CoverageRow): BandFamilySpec[] {
       };
     }),
     family("percent_change", (ctx, rng) => {
-      const start = rng.int(40, 180);
       const percent = rng.pick([10, 20, 25, 50]);
-      const correct = Math.round(start * (1 + percent / 100));
+      const unit = 100 / gcd(percent, 100);
+      const start = unit * rng.int(Math.ceil(40 / unit), Math.floor(180 / unit));
+      const increase = start * percent / 100;
+      const correct = start + increase;
       return {
         prompt: `A price of ${start} increases by ${percent}%. What is the new price?`,
         correct: String(correct),
-        distractors: numericDistractors(correct, [percent, -percent, Math.round(start * percent / 100), -Math.round(start * percent / 100)], 0),
-        explanation: `Find the increase, then add it to the start price.`,
+        distractors: numericDistractors(correct, [percent, -percent, increase, -increase], 0),
+        explanation: `The increase is ${start} × ${percent}/100 = ${increase}. The new price is ${start} + ${increase} = ${correct}.`,
         strategyTags: ["find the change first", "new amount = original + change"],
         trapWarning: "Percent increase changes the original amount; it is not the final answer by itself."
       };
     }),
     family("fraction_decimal_match", (ctx, rng) => {
-      const pair = rng.pick([
+      const pair = rng.pick<[number, number, string]>([
         [1, 2, "0.5"],
         [1, 4, "0.25"],
         [3, 4, "0.75"],
@@ -974,7 +976,7 @@ function decimalPercentFamilies(row: CoverageRow): BandFamilySpec[] {
       };
     }),
     family("percent_to_fraction", (ctx, rng) => {
-      const pair = rng.pick([
+      const pair = rng.pick<[number, string]>([
         [10, "1/10"],
         [20, "1/5"],
         [25, "1/4"],
@@ -1502,7 +1504,7 @@ function systemsFamilies(row: CoverageRow): BandFamilySpec[] {
       const x = rng.int(2, 8);
       const y = rng.int(3, 9);
       const a = rng.int(2, 5);
-      const b = rng.int(2, 5);
+      const b = rng.pick([2, 3, 4, 5].filter((value) => value !== a));
       const eq1 = x + y;
       const eq2 = a * x + b * y;
       return {
@@ -1546,7 +1548,7 @@ function systemsFamilies(row: CoverageRow): BandFamilySpec[] {
       const x = rng.int(2, 7);
       const y = 2 * x + 1;
       return {
-        prompt: `Line A follows y = 2x + 1. Line B passes through (${x}, ${y}). What is the x-coordinate of their intersection?`,
+        prompt: `Line A follows y = 2x + 1. A different line B passes through (${x}, ${y}). What is the x-coordinate of their intersection?`,
         correct: String(x),
         distractors: numericDistractors(x, [1, -1, y - x, 2], 0),
         explanation: `The given point lies on both lines, so its x-coordinate is ${x}.`,
@@ -1591,7 +1593,7 @@ function quadraticFamilies(row: CoverageRow): BandFamilySpec[] {
       return {
         prompt: `x^2 + ${sum}x + ${product} factors as (x + ?)(x + ?). What are the two numbers?`,
         correct: `${a} and ${b}`,
-        distractors: textDistractors(`${a} and ${b}`, [`${sum} and ${product}`, `${a} and ${product}`, `${b} and ${product}`, `${a + 1} and ${b - 1}`]),
+        distractors: textDistractors(`${a} and ${b}`, [`${sum} and ${product}`, `${a} and ${product}`, `${b} and ${product}`, `${a + 1} and ${b + 1}`]),
         explanation: `For x^2 + ${sum}x + ${product}, find two numbers with sum ${sum} and product ${product}.`,
         strategyTags: ["look for sum and product", "test factor pairs"],
         trapWarning: "The pair must fit both the sum and the product."
@@ -1719,7 +1721,7 @@ function inequalitiesFamilies(row: CoverageRow): BandFamilySpec[] {
       return {
         prompt: `Which value satisfies x + ${add} < ${bound}?`,
         correct: String(x - 1),
-        distractors: numericDistractors(x - 1, [1, -1, add, -add], -20, 40),
+        distractors: [x, x + 1, x + 2, x + 3].map(String),
         explanation: `Subtract ${add} from both sides to get x < ${bound - add}.`,
         strategyTags: ["undo the same step on both sides", "test the answer back in the inequality"],
         trapWarning: "An inequality has many solutions; the choice only needs to satisfy the relation."
@@ -1956,11 +1958,11 @@ function advancedAlgebraFamilies(row: CoverageRow): BandFamilySpec[] {
     }),
     family("evaluate_rational", (ctx, rng) => {
       const x = rng.int(2, 8);
-      const correct = formatDecimal((x + 1) / (x - 1));
+      const correct = rationalText(x + 1, x - 1);
       return {
         prompt: `Evaluate (x + 1)/(x - 1) when x = ${x}.`,
         correct,
-        distractors: textDistractors(correct, [formatDecimal((x - 1) / (x + 1)), formatDecimal((x + 1) / x), formatDecimal((x - 1) / x), String(x)]),
+        distractors: textDistractors(correct, [rationalText(x - 1, x + 1), rationalText(x + 1, x), rationalText(x - 1, x), String(x)]),
         explanation: `Substitute x and simplify the fraction.`,
         strategyTags: ["substitute with parentheses", "simplify after substitution"],
         trapWarning: "Keep numerator and denominator grouped when substituting."

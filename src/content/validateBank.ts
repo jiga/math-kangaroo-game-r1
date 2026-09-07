@@ -14,8 +14,10 @@ function assert(condition: unknown, message: string): void {
 }
 
 function rowsForGrade(grade: Grade) {
-  if (grade <= 2) return g12Coverage.grades[String(grade) as "1" | "2"].curriculum;
-  return bankForGrade(grade).coverageMap.curriculum;
+  if (grade === 1 || grade === 2) return g12Coverage.grades[grade].curriculum;
+  const coverage = bankForGrade(grade).coverageMap;
+  if (!("curriculum" in coverage)) fail(`Grade ${grade} bank is missing curriculum coverage`);
+  return coverage.curriculum;
 }
 
 function configForGrade(grade: Grade) {
@@ -32,7 +34,8 @@ function validateGrade(grade: Grade): void {
     const actual = stats.bySkill[row.skillId] || 0;
     assert(actual >= row.requiredTemplates, `Grade ${grade} skill ${row.skillId} has ${actual}, expected >= ${row.requiredTemplates}`);
     const familyCount = Object.keys(stats.byFamily).filter((key) => key.startsWith(`${row.skillId}:`)).length;
-    const requiredFamilies = row.requiredFamilies ?? (row.requiredTemplates >= 8 ? 4 : 3);
+    const requiredFamilies = ("requiredFamilies" in row ? row.requiredFamilies : undefined)
+      ?? (row.requiredTemplates >= 8 ? 4 : 3);
     assert(familyCount >= requiredFamilies, `Grade ${grade} skill ${row.skillId} has only ${familyCount}, expected >= ${requiredFamilies}`);
   }
 

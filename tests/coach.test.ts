@@ -7,6 +7,7 @@ import { enrichCoachText } from "../src/coach/llmAdapter";
 const question: QuestionInstance = {
   id: "q1",
   grade: 1,
+  bandId: "g12",
   pointTier: 3,
   skillId: "single_digit_add_sub",
   familyId: "fact_fluency",
